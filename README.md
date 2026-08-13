@@ -24,3 +24,8 @@ Proje kapsamı, teknoloji yığını ve kişi bazlı görev detayları için:
 /backend     -> API kodu
 /database    -> migration ve şema dosyaları
 /tests       -> test otomasyonu
+
+
+## Sürüm Notları
+
+- **13.08.2026** — Yüksel: auth/cari/fatura API'leri tamamlandı, develop'a merge edildi. Paylaşılan altyapı eklendi: `backend/src/db/pool.js` (veritabanı bağlantısı), `backend/src/middleware/auth.middleware.js` (giriş kontrolü), `backend/src/utils/` (ortak yardımcılar). Gider modülünü yazarken bunları tekrar yazmayın — önce `develop`'u kendi branch'inize çekin: `git checkout feature/gider-modulu && git merge develop`.

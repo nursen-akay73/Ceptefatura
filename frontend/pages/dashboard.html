@@ -1,0 +1,180 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Dashboard | Akıllı Muhasebe</title>
+    <link rel="stylesheet" href="../assets/css/style.css">
+    <style>
+        .chart-12-months {
+            gap: 8px !important;
+        }
+
+            .chart-12-months .bar span {
+                font-size: 9px !important;
+            }
+
+        .btn-logout {
+            color: #dc2626;
+            background: #fef2f2;
+            border: 1px solid #fca5a5;
+            padding: 8px 14px;
+            border-radius: 8px;
+            text-decoration: none;
+            font-size: 13px;
+            font-weight: 600;
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            transition: all 0.2s ease;
+            box-shadow: 0 1px 2px rgba(239, 68, 68, 0.08);
+        }
+
+            .btn-logout:hover {
+                color: #ffffff;
+                background: #ef4444;
+                border-color: #dc2626;
+                box-shadow: 0 2px 4px rgba(239, 68, 68, 0.2);
+            }
+    </style>
+</head>
+<body data-page="dashboard">
+    <div id="sidebar-container"></div>
+    <div class="main">
+        <div id="header-container"></div>
+        <main class="content">
+
+            <div class="page-heading" style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 24px;">
+                <div>
+                    <h1 style="margin: 0;">Hoş geldiniz</h1>
+                    <p class="muted" style="margin: 4px 0 0 0; font-size: 13px;">Finansal durumunuzun genel özetini buradan takip edebilirsiniz.</p>
+                </div>
+                <div>
+                    <a href="login.html" class="btn-logout">
+                      Çıkış Yap
+                    </a>
+                </div>
+            </div>
+            <div class="grid stats">
+                <div class="card stat-card">
+                    <span class="label">Toplam Nakit</span>
+                    <div class="value">₺125.000</div>
+                    <span class="change">↑ %8,4 geçen aya göre</span>
+                </div>
+                <div class="card stat-card">
+                    <span class="label">Bu Ay Gelir</span>
+                    <div class="value">₺85.000</div>
+                    <span class="change">↑ %12,1 geçen aya göre</span>
+                </div>
+                <div class="card stat-card">
+                    <span class="label">Bu Ay Gider</span>
+                    <div class="value">₺32.000</div>
+                    <span class="change">↓ %4,2 geçen aya göre</span>
+                </div>
+                <div class="card stat-card">
+                    <span class="label">Bekleyen Tahsilat</span>
+                    <div class="value">₺18.500</div>
+                    <span class="change">5 fatura bekliyor</span>
+                </div>
+            </div>
+            <br>
+
+            <div class="grid two-col">
+                <div class="card">
+                    <div class="card-header">
+                        <h2>Gelir / Gider Özeti (Yıllık 12 Ay)</h2>
+                        <a class="link" href="reports.html">Detaylı Rapor</a>
+                    </div>
+                    <div class="chart chart-12-months">
+                        <div class="bar" style="height:42%"><span>Oca</span></div>
+                        <div class="bar" style="height:58%"><span>Şub</span></div>
+                        <div class="bar" style="height:48%"><span>Mar</span></div>
+                        <div class="bar" style="height:72%"><span>Nis</span></div>
+                        <div class="bar" style="height:64%"><span>May</span></div>
+                        <div class="bar" style="height:86%"><span>Haz</span></div>
+                        <div class="bar" style="height:70%"><span>Tem</span></div>
+                        <div class="bar" style="height:60%"><span>Ağu</span></div>
+                        <div class="bar" style="height:68%"><span>Eyl</span></div>
+                        <div class="bar" style="height:75%"><span>Eki</span></div>
+                        <div class="bar" style="height:80%"><span>Kas</span></div>
+                        <div class="bar" style="height:85%"><span>Ara</span></div>
+                    </div>
+                </div>
+
+                <div class="card">
+                    <div class="card-header">
+                        <h2>Hızlı İşlemler</h2>
+                    </div>
+                    <div class="quick-actions">
+                        <a href="invoice-new.html"> Yeni Fatura</a>
+                        <a href="expense-new.html"> Yeni Gider</a>
+                        <a href="invoice-template.html"> Fatura Şablonu</a>
+                        <a href="reports.html"> Raporlar</a>
+                        <a href="accounts.html"> Cari Hesaplar</a>
+                        <a href="accountant.html"> Muhasebeci Paneli</a>
+                    </div>
+                </div>
+            </div>
+            <br>
+
+            <div class="grid two-col">
+                <div class="card">
+                    <div class="card-header">
+                        <h2>Son Faturalar</h2>
+                        <a class="link" href="invoices.html">Tümünü Gör</a>
+                    </div>
+                    <div class="table-wrap">
+                        <table class="table">
+                            <thead>
+                                <tr>
+                                    <th>FATURA NO</th>
+                                    <th>CARİ</th>
+                                    <th>TARİH</th>
+                                    <th>TUTAR</th>
+                                    <th>DURUM</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <tr>
+                                    <td>INV-2026-001</td>
+                                    <td>ABC Teknoloji</td>
+                                    <td>03.08.2026</td>
+                                    <td>₺12.500</td>
+                                    <td><span class="badge success">Ödendi</span></td>
+                                </tr>
+                                <tr>
+                                    <td>INV-2026-002</td>
+                                    <td>XYZ Danışmanlık</td>
+                                    <td>01.08.2026</td>
+                                    <td>₺8.750</td>
+                                    <td><span class="badge warning">Bekliyor</span></td>
+                                </tr>
+                                <tr>
+                                    <td>INV-2026-003</td>
+                                    <td>Beta Lojistik</td>
+                                    <td>28.07.2026</td>
+                                    <td>₺5.400</td>
+                                    <td><span class="badge danger">Gecikti</span></td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+
+                <div class="card">
+                    <div class="card-header">
+                        <h2>Yaklaşan Ödemeler</h2>
+                    </div>
+                    <p><strong>XYZ Danışmanlık</strong><br><span class="muted">Vade: 10.08.2026</span></p>
+                    <div class="progress"><span style="width: 70%;"></span></div>
+                    <br>
+                    <p><strong>Beta Lojistik</strong><br><span class="muted">Vade: 15.08.2026</span></p>
+                    <div class="progress"><span style="width: 40%;"></span></div>
+                </div>
+            </div>
+
+        </main>
+    </div>
+    <script src="../assets/js/script.js"></script>
+</body>
+</html>

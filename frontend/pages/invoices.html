@@ -1,0 +1,329 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Faturalar | Akıllı Muhasebe</title>
+    <link rel="stylesheet" href="../assets/css/style.css">
+    <style>
+
+        .modal-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: rgba(15, 23, 42, 0.5);
+            backdrop-filter: blur(4px);
+            display: none;
+            align-items: center;
+            justify-content: center;
+            z-index: 9999;
+        }
+
+            .modal-overlay.active {
+                display: flex;
+            }
+
+        .modal-card {
+            background: #fff;
+            border-radius: 12px;
+            width: 90%;
+            max-width: 600px;
+            padding: 24px;
+            box-shadow: 0 20px 25px -5px rgba(0,0,0,0.1);
+            animation: modalIn 0.2s ease-out;
+        }
+
+        @keyframes modalIn {
+            from {
+                opacity: 0;
+                transform: scale(0.95);
+            }
+
+            to {
+                opacity: 1;
+                transform: scale(1);
+            }
+        }
+
+        .modal-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            border-bottom: 1px solid #f1f5f9;
+            padding-bottom: 12px;
+            margin-bottom: 16px;
+        }
+
+        .modal-close {
+            background: none;
+            border: none;
+            font-size: 24px;
+            cursor: pointer;
+            color: var(--muted);
+        }
+
+        .invoice-preview-table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 12px;
+            font-size: 13px;
+        }
+
+            .invoice-preview-table th, .invoice-preview-table td {
+                padding: 8px 12px;
+                border-bottom: 1px solid #f1f5f9;
+                text-align: left;
+            }
+
+        .invoice-summary {
+            margin-top: 16px;
+            display: flex;
+            flex-direction: column;
+            align-items: flex-end;
+            gap: 6px;
+            font-size: 13px;
+        }
+
+        .no-result-row {
+            text-align: center;
+            color: var(--muted);
+            padding: 20px;
+            font-weight: 500;
+        }
+    </style>
+</head>
+<body data-page="invoices">
+    <div id="sidebar-container"></div>
+    <div class="main">
+        <div id="header-container"></div>
+        <main class="content">
+
+            <div class="page-heading">
+                <div>
+                    <h1>Faturalar</h1>
+                    <p>Kesilen ve gelen faturalarınızı yönetin.</p>
+                </div>
+                <div style="display:flex; gap:10px;">
+                    <a class="btn btn-secondary" href="dashboard.html"> Ana Sayfa</a>
+                    <a class="btn btn-primary" href="invoice-new.html"> Yeni Fatura</a>
+                </div>
+            </div>
+
+            <div class="card">
+      
+                <div class="filter-row">
+                    <input type="search" id="filter-search" placeholder="Fatura no veya cari ara...">
+                    <select id="filter-status">
+                        <option value="Tüm Durumlar">Tüm Durumlar</option>
+                        <option value="Ödendi">Ödendi</option>
+                        <option value="Bekliyor">Bekliyor</option>
+                        <option value="Gecikti">Gecikti</option>
+                    </select>
+                    <select id="filter-type">
+                        <option value="Tüm Türler">Tüm Türler</option>
+                        <option value="E-Fatura">E-Fatura</option>
+                        <option value="E-Arşiv">E-Arşiv</option>
+                    </select>
+                </div>
+
+                <div class="table-wrap">
+                    <table class="table">
+                        <thead>
+                            <tr>
+                                <th>FATURA NO</th>
+                                <th>CARİ</th>
+                                <th>FATURA TÜRÜ</th>
+                                <th>TARİH</th>
+                                <th>VADE</th>
+                                <th>TUTAR</th>
+                                <th>DURUM</th>
+                                <th>İŞLEM</th>
+                            </tr>
+                        </thead>
+                        <tbody id="invoice-table-body">
+                            <tr>
+                                <td>INV-2026-001</td>
+                                <td>ABC Teknoloji</td>
+                                <td>E-Fatura</td>
+                                <td>03.08.2026</td>
+                                <td>03.09.2026</td>
+                                <td>₺12.500</td>
+                                <td><span class="badge success">Ödendi</span></td>
+                                <td><button class="text-btn btn-detail" data-no="INV-2026-001" data-cari="ABC Teknoloji" data-turu="E-Fatura" data-tarih="03.08.2026" data-tutar="₺12.500" data-durum="Ödendi">Detay</button></td>
+                            </tr>
+                            <tr>
+                                <td>INV-2026-002</td>
+                                <td>XYZ Danışmanlık</td>
+                                <td>E-Arşiv</td>
+                                <td>01.08.2026</td>
+                                <td>10.08.2026</td>
+                                <td>₺8.750</td>
+                                <td><span class="badge warning">Bekliyor</span></td>
+                                <td><button class="text-btn btn-detail" data-no="INV-2026-002" data-cari="XYZ Danışmanlık" data-turu="E-Arşiv" data-tarih="01.08.2026" data-tutar="₺8.750" data-durum="Bekliyor">Detay</button></td>
+                            </tr>
+                            <tr>
+                                <td>INV-2026-003</td>
+                                <td>Beta Lojistik</td>
+                                <td>E-Fatura</td>
+                                <td>28.07.2026</td>
+                                <td>28.07.2026</td>
+                                <td>₺5.400</td>
+                                <td><span class="badge danger">Gecikti</span></td>
+                                <td><button class="text-btn btn-detail" data-no="INV-2026-003" data-cari="Beta Lojistik" data-turu="E-Fatura" data-tarih="28.07.2026" data-tutar="₺5.400" data-durum="Gecikti">Detay</button></td>
+                            </tr>
+                            <tr>
+                                <td>INV-2026-004</td>
+                                <td>Delta Mimarlık</td>
+                                <td>E-Arşiv</td>
+                                <td>04.08.2026</td>
+                                <td>20.08.2026</td>
+                                <td>₺14.200</td>
+                                <td><span class="badge warning">Bekliyor</span></td>
+                                <td><button class="text-btn btn-detail" data-no="INV-2026-004" data-cari="Delta Mimarlık" data-turu="E-Arşiv" data-tarih="04.08.2026" data-tutar="₺14.200" data-durum="Bekliyor">Detay</button></td>
+                            </tr>
+                            <tr>
+                                <td>INV-2026-005</td>
+                                <td>Zirve Enerji</td>
+                                <td>E-Fatura</td>
+                                <td>25.07.2026</td>
+                                <td>15.08.2026</td>
+                                <td>₺22.000</td>
+                                <td><span class="badge success">Ödendi</span></td>
+                                <td><button class="text-btn btn-detail" data-no="INV-2026-005" data-cari="Zirve Enerji" data-turu="E-Fatura" data-tarih="25.07.2026" data-tutar="₺22.000" data-durum="Ödendi">Detay</button></td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+
+        </main>
+    </div>
+
+    
+    <div class="modal-overlay" id="invoiceModal">
+        <div class="modal-card">
+            <div class="modal-header">
+                <div>
+                    <h2 id="m-fatura-no" style="font-size:18px; margin:0; color:var(--text);">INV-2026-001</h2>
+                    <span id="m-fatura-turu" class="badge" style="margin-top:4px; display:inline-block;">E-Fatura</span>
+                </div>
+                <button class="modal-close" id="closeModal">&times;</button>
+            </div>
+            <div class="modal-body">
+                <div style="display:grid; grid-template-columns:1fr 1fr; gap:12px; margin-bottom:16px; font-size:13px;">
+                    <div><strong>Müşteri / Cari:</strong> <span id="m-cari">ABC Teknoloji</span></div>
+                    <div><strong>Kesim Tarihi:</strong> <span id="m-tarih">03.08.2026</span></div>
+                    <div><strong>Durum:</strong> <span id="m-durum">Ödendi</span></div>
+                    <div><strong>Ödeme Yöntemi:</strong> Banka Havalesi / EFT</div>
+                </div>
+
+           
+                <table class="invoice-preview-table">
+                    <thead>
+                        <tr style="background:#f8fafc;">
+                            <th>Hizmet / Ürün</th>
+                            <th>Miktar</th>
+                            <th>KDV</th>
+                            <th>Tutar</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr>
+                            <td>Yazılım & Danışmanlık Hizmeti</td>
+                            <td>1 Adet</td>
+                            <td>%20</td>
+                            <td id="m-kalem-tutar">₺12.500,00</td>
+                        </tr>
+                    </tbody>
+                </table>
+
+                <div class="invoice-summary">
+                    <div style="font-size:15px; font-weight:bold; color:var(--primary); margin-top:8px;">
+                        Genel Toplam: <span id="m-toplam">₺12.500,00</span>
+                    </div>
+                </div>
+            </div>
+            <div style="display:flex; justify-content:flex-end; gap:10px; margin-top:20px; border-top:1px solid #f1f5f9; padding-top:12px;">
+                <button class="btn btn-secondary" id="closeModalBtn">Kapat</button>
+                <button class="btn btn-primary" onclick="window.print()"> PDF İndir / Yazdır</button>
+            </div>
+        </div>
+    </div>
+
+    <script src="../assets/js/script.js"></script>
+    <script>
+        document.addEventListener('DOMContentLoaded', function () {
+    
+            const searchInput = document.getElementById('filter-search');
+            const statusSelect = document.getElementById('filter-status');
+            const typeSelect = document.getElementById('filter-type');
+            const rows = document.querySelectorAll('#invoice-table-body tr');
+
+            function filterInvoices() {
+                const query = searchInput.value.toLowerCase().trim();
+                const selectedStatus = statusSelect.value;
+                const selectedType = typeSelect.value;
+
+                rows.forEach(row => {
+                    const no = row.cells[0].innerText.toLowerCase();
+                    const cari = row.cells[1].innerText.toLowerCase();
+                    const type = row.cells[2].innerText;
+                    const status = row.querySelector('.badge').innerText;
+
+                    const matchesSearch = no.includes(query) || cari.includes(query);
+                    const matchesStatus = (selectedStatus === 'Tüm Durumlar') || (status === selectedStatus);
+                    const matchesType = (selectedType === 'Tüm Türler') || (type === selectedType);
+
+                    if (matchesSearch && matchesStatus && matchesType) {
+                        row.style.display = '';
+                    } else {
+                        row.style.display = 'none';
+                    }
+                });
+            }
+
+            searchInput.addEventListener('input', filterInvoices);
+            statusSelect.addEventListener('change', filterInvoices);
+            typeSelect.addEventListener('change', filterInvoices);
+
+            const modal = document.getElementById('invoiceModal');
+            const closeModal = document.getElementById('closeModal');
+            const closeModalBtn = document.getElementById('closeModalBtn');
+            const detailBtns = document.querySelectorAll('.btn-detail');
+
+            detailBtns.forEach(btn => {
+                btn.addEventListener('click', function () {
+                    const no = this.getAttribute('data-no');
+                    const cari = this.getAttribute('data-cari');
+                    const turu = this.getAttribute('data-turu');
+                    const tarih = this.getAttribute('data-tarih');
+                    const tutar = this.getAttribute('data-tutar');
+                    const durum = this.getAttribute('data-durum');
+
+                    document.getElementById('m-fatura-no').innerText = no;
+                    document.getElementById('m-fatura-turu').innerText = turu;
+                    document.getElementById('m-cari').innerText = cari;
+                    document.getElementById('m-tarih').innerText = tarih;
+                    document.getElementById('m-durum').innerText = durum;
+                    document.getElementById('m-kalem-tutar').innerText = tutar;
+                    document.getElementById('m-toplam').innerText = tutar;
+
+                    modal.classList.add('active');
+                });
+            });
+
+            function hideModal() {
+                modal.classList.remove('active');
+            }
+
+            if (closeModal) closeModal.addEventListener('click', hideModal);
+            if (closeModalBtn) closeModalBtn.addEventListener('click', hideModal);
+            modal.addEventListener('click', function (e) {
+                if (e.target === modal) hideModal();
+            });
+        });
+    </script>
+</body>
+</html>

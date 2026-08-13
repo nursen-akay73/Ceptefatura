@@ -1,0 +1,230 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Raporlar ve Analizler | Akıllı Muhasebe</title>
+    <link rel="stylesheet" href="../assets/css/style.css">
+    <style>
+        .chart-container {
+            display: flex;
+            align-items: flex-end;
+            gap: 12px;
+            height: 220px;
+            padding-top: 20px;
+            margin-bottom: 25px;
+        }
+
+            .chart-container .bar {
+                flex: 1;
+                background: linear-gradient(180deg, var(--primary) 0%, #60a5fa 100%);
+                border-radius: 6px 6px 0 0;
+                position: relative;
+                transition: height 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+            }
+
+                .chart-container .bar span {
+                    position: absolute;
+                    bottom: -24px;
+                    left: 50%;
+                    transform: translateX(-50%);
+                    font-size: 11px;
+                    color: var(--muted);
+                    font-weight: 500;
+                    white-space: nowrap;
+                }
+    </style>
+</head>
+<body data-page="reports">
+    <div id="sidebar-container"></div>
+    <div class="main">
+        <div id="header-container"></div>
+        <main class="content">
+
+            <div class="page-heading">
+                <div>
+                    <h1>Raporlar ve Analizler</h1>
+                    <p>Nakit akışı tahminleri, KDV durumları ve yıllık finansal özetler.</p>
+                </div>
+                <div style="display:flex; gap:10px;">
+                    <a class="btn btn-secondary" href="dashboard.html"> Ana Sayfa</a>
+                    <button class="btn btn-primary" onclick="window.print()">PDF Rapor Al</button>
+                </div>
+            </div>
+
+            <div class="card" style="margin-bottom: 20px;">
+               
+                <div class="filter-row" style="margin: 0;">
+                    <select id="select-period" style="min-width: 220px;">
+                        <option value="all" selected>2026 Yılı Tümü (12 Ay)</option>
+                        <option value="01">Ocak 2026</option>
+                        <option value="02">Şubat 2026</option>
+                        <option value="03">Mart 2026</option>
+                        <option value="04">Nisan 2026</option>
+                        <option value="05">Mayıs 2026</option>
+                        <option value="06">Haziran 2026</option>
+                        <option value="07">Temmuz 2026</option>
+                        <option value="08">Ağustos 2026</option>
+                        <option value="09">Eylül 2026</option>
+                        <option value="10">Ekim 2026</option>
+                        <option value="11">Kasım 2026</option>
+                        <option value="12">Aralık 2026</option>
+                    </select>
+
+                    <select id="select-type">
+                        <option value="gelir">Gelirler</option>
+                        <option value="gider">Giderler</option>
+                        <option value="net">Net Kar / Zarar</option>
+                    </select>
+                </div>
+            </div>
+
+
+            <div class="grid stats">
+                <div class="card stat-card">
+                    <span class="label">Net Nakit Akışı</span>
+                    <div class="value" id="val-cash">₺245.000</div>
+                    <span class="change" id="val-cash-sub" style="color:var(--success);">Nakit akışı pozitif</span>
+                </div>
+                <div class="card stat-card">
+                    <span class="label">Hesaplanan KDV (Satış)</span>
+                    <div class="value" id="val-vat-sales">₺32.400</div>
+                </div>
+                <div class="card stat-card">
+                    <span class="label">İndirilecek KDV (Alış)</span>
+                    <div class="value" id="val-vat-buy">₺6.200</div>
+                </div>
+                <div class="card stat-card">
+                    <span class="label">Ödenecek Net KDV</span>
+                    <div class="value" id="val-vat-net">₺26.200</div>
+                    <span class="change" style="color:var(--warning);" id="val-vat-date">Tahmini son gün: 26.08.2026</span>
+                </div>
+            </div>
+            <br>
+
+            <div class="grid two-col">
+                <div class="card">
+                    <div class="card-header">
+                        <h2 id="chart-title">Gelir Trendi (12 Aylık Yıllık Görünüm)</h2>
+                    </div>
+                    <div class="chart-container" id="chart-bars">
+    
+                    </div>
+                </div>
+
+                <div class="card">
+                    <div class="card-header">
+                        <h2>Gider Kategori Dağılımı</h2>
+                    </div>
+                    <div id="category-container" style="display:flex; flex-direction:column; gap:16px; margin-top:12px;">
+             
+                    </div>
+                </div>
+            </div>
+
+        </main>
+    </div>
+
+    <script src="../assets/js/script.js"></script>
+    <script>
+        document.addEventListener('DOMContentLoaded', function () {
+            const periodSelect = document.getElementById('select-period');
+            const typeSelect = document.getElementById('select-type');
+
+            const reportData = {
+                all: {
+                    title: "12 Aylık Yıllık Görünüm",
+                    cash: "₺245.000",
+                    vatSales: "₺32.400",
+                    vatBuy: "₺6.200",
+                    vatNet: "₺26.200",
+                    bars: [
+                        { label: "Oca", h: "42%" }, { label: "Şub", h: "58%" }, { label: "Mar", h: "48%" },
+                        { label: "Nis", h: "72%" }, { label: "May", h: "64%" }, { label: "Haz", h: "86%" },
+                        { label: "Tem", h: "70%" }, { label: "Ağu", h: "60%" }, { label: "Eyl", h: "68%" },
+                        { label: "Eki", h: "75%" }, { label: "Kas", h: "80%" }, { label: "Ara", h: "85%" }
+                    ],
+                    categories: [
+                        { name: "Ofis & Genel Giderler", amount: "₺12.500", pct: 39 },
+                        { name: "Ulaşım & Lojistik", amount: "₺8.200", pct: 25 },
+                        { name: "Hizmet & Danışmanlık", amount: "₺6.800", pct: 21 },
+                        { name: "Diğer Giderler", amount: "₺4.500", pct: 15 }
+                    ]
+                },
+                monthlyTemplate: function (monthName) {
+                    return {
+                        title: `${monthName} 2026 (Haftalık Dağılım)`,
+                        cash: "₺" + (Math.floor(Math.random() * 20000) + 15000).toLocaleString('tr-TR'),
+                        vatSales: "₺" + (Math.floor(Math.random() * 4000) + 2000).toLocaleString('tr-TR'),
+                        vatBuy: "₺" + (Math.floor(Math.random() * 1000) + 500).toLocaleString('tr-TR'),
+                        vatNet: "₺" + (Math.floor(Math.random() * 3000) + 1500).toLocaleString('tr-TR'),
+                        bars: [
+                            { label: "1. Hafta", h: (Math.floor(Math.random() * 40) + 40) + "%" },
+                            { label: "2. Hafta", h: (Math.floor(Math.random() * 40) + 50) + "%" },
+                            { label: "3. Hafta", h: (Math.floor(Math.random() * 40) + 30) + "%" },
+                            { label: "4. Hafta", h: (Math.floor(Math.random() * 40) + 60) + "%" }
+                        ],
+                        categories: [
+                            { name: "Ofis & Genel Giderler", amount: "₺" + (Math.floor(Math.random() * 3000) + 1000), pct: 40 },
+                            { name: "Ulaşım & Lojistik", amount: "₺" + (Math.floor(Math.random() * 2000) + 800), pct: 25 },
+                            { name: "Hizmet & Danışmanlık", amount: "₺" + (Math.floor(Math.random() * 1500) + 500), pct: 20 },
+                            { name: "Diğer Giderler", amount: "₺" + (Math.floor(Math.random() * 1000) + 300), pct: 15 }
+                        ]
+                    };
+                }
+            };
+
+            function updateDashboard() {
+                const selectedPeriod = periodSelect.value;
+                const selectedPeriodText = periodSelect.options[periodSelect.selectedIndex].text;
+                const selectedType = typeSelect.options[typeSelect.selectedIndex].text;
+
+                let data;
+                if (selectedPeriod === 'all') {
+                    data = reportData.all;
+                } else {
+                    data = reportData.monthlyTemplate(selectedPeriodText.split(' ')[0]);
+                }
+
+                document.getElementById('chart-title').innerText = `${selectedType} - ${data.title}`;
+
+         
+                document.getElementById('val-cash').innerText = data.cash;
+                document.getElementById('val-vat-sales').innerText = data.vatSales;
+                document.getElementById('val-vat-buy').innerText = data.vatBuy;
+                document.getElementById('val-vat-net').innerText = data.vatNet;
+
+                const chartContainer = document.getElementById('chart-bars');
+                chartContainer.innerHTML = '';
+                data.bars.forEach(bar => {
+                    const barDiv = document.createElement('div');
+                    barDiv.className = 'bar';
+                    barDiv.style.height = bar.h;
+                    barDiv.innerHTML = `<span>${bar.label}</span>`;
+                    chartContainer.appendChild(barDiv);
+                });
+
+                const categoryContainer = document.getElementById('category-container');
+                categoryContainer.innerHTML = '';
+                data.categories.forEach(cat => {
+                    const catDiv = document.createElement('div');
+                    catDiv.innerHTML = `
+              <div style="display:flex; justify-content:space-between; font-size:13px; margin-bottom:6px;">
+                <span>${cat.name}</span>
+                <strong>${cat.amount} (%${cat.pct})</strong>
+              </div>
+              <div class="progress"><span style="width: ${cat.pct}%;"></span></div>
+            `;
+                    categoryContainer.appendChild(catDiv);
+                });
+            }
+
+            periodSelect.addEventListener('change', updateDashboard);
+            typeSelect.addEventListener('change', updateDashboard);
+
+       
+            updateDashboard();
+        });
+    </script>
+</body>
+</html>

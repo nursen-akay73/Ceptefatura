@@ -1,0 +1,399 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Muhasebeci Paneli | Akıllı Muhasebe</title>
+    <link rel="stylesheet" href="../assets/css/style.css">
+    <style>
+        .modal-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: rgba(15, 23, 42, 0.5);
+            backdrop-filter: blur(4px);
+            display: none;
+            align-items: center;
+            justify-content: center;
+            z-index: 9999;
+        }
+
+            .modal-overlay.active {
+                display: flex;
+            }
+
+        .modal-card {
+            background: #fff;
+            border-radius: 12px;
+            width: 90%;
+            max-width: 550px;
+            padding: 24px;
+            box-shadow: 0 20px 25px -5px rgba(0,0,0,0.1);
+            animation: modalIn 0.2s ease-out;
+        }
+
+        @keyframes modalIn {
+            from {
+                opacity: 0;
+                transform: scale(0.95);
+            }
+
+            to {
+                opacity: 1;
+                transform: scale(1);
+            }
+        }
+
+        .modal-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            border-bottom: 1px solid #f1f5f9;
+            padding-bottom: 12px;
+            margin-bottom: 16px;
+        }
+
+        .modal-close {
+            background: none;
+            border: none;
+            font-size: 24px;
+            cursor: pointer;
+            color: var(--muted);
+        }
+
+        .detail-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 12px;
+            font-size: 13px;
+            margin-bottom: 16px;
+            background: #f8fafc;
+            padding: 12px;
+            border-radius: 8px;
+        }
+
+        .status-list {
+            list-style: none;
+            padding: 0;
+            margin: 0;
+            font-size: 13px;
+        }
+
+            .status-list li {
+                display: flex;
+                justify-content: space-between;
+                padding: 8px 0;
+                border-bottom: 1px dashed #e2e8f0;
+            }
+
+                .status-list li:last-child {
+                    border-bottom: none;
+                }
+    </style>
+</head>
+<body data-page="accountant">
+    <div id="sidebar-container"></div>
+    <div class="main">
+        <div id="header-container"></div>
+        <main class="content">
+
+            <div class="page-heading">
+                <div>
+                    <h1>Muhasebeci Paneli</h1>
+                    <p>Bağlı işletmelerinizi tek panelden takip edin.</p>
+                </div>
+                <div style="display:flex; gap:10px;">
+                    <a class="btn btn-secondary" href="dashboard.html"> Ana Sayfa</a>
+                    <button class="btn btn-primary" id="btn-open-add-company"> İşletme Ekle</button>
+                </div>
+            </div>
+
+            <div class="grid stats">
+                <div class="card stat-card"><span class="label">Bağlı İşletme</span><div class="value" id="stat-company-count">12</div></div>
+                <div class="card stat-card"><span class="label">Bekleyen Belge</span><div class="value">18</div></div>
+                <div class="card stat-card"><span class="label">Bu Ay Tamamlanan</span><div class="value">146</div></div>
+                <div class="card stat-card"><span class="label">Yaklaşan Beyanname</span><div class="value">4</div></div>
+            </div>
+            <br>
+
+            <div class="card">
+                <div class="card-header">
+                    <h2>Bağlı İşletmeler</h2>
+                    <input class="table-input" id="search-company" placeholder="İşletme veya vergi no ara...">
+                </div>
+                <div class="table-wrap">
+                    <table class="table">
+                        <thead>
+                            <tr>
+                                <th>İŞLETME</th>
+                                <th>VERGİ NO</th>
+                                <th>SON İŞLEM</th>
+                                <th>DÖNEM</th>
+                                <th>DURUM</th>
+                                <th>İŞLEM</th>
+                            </tr>
+                        </thead>
+                        <tbody id="company-table-body">
+                            <tr>
+                                <td><strong>ABC Teknoloji</strong></td>
+                                <td>1234567890</td>
+                                <td>03.08.2026</td>
+                                <td>Temmuz 2026</td>
+                                <td><span class="badge success">Aktif</span></td>
+                                <td>
+                                    <button class="text-btn btn-company-detail"
+                                            data-isletme="ABC Teknoloji"
+                                            data-vno="1234567890"
+                                            data-sonislem="03.08.2026"
+                                            data-donem="Temmuz 2026"
+                                            data-durum="Aktif"
+                                            data-bekleyen="3 Belge"
+                                            data-kdv="Hazırlandı ✓"
+                                            data-muhtasar="Onay Bekliyor">
+                                        Detay
+                                    </button>
+                                </td>
+                            </tr>
+                            <tr>
+                                <td><strong>XYZ Danışmanlık</strong></td>
+                                <td>9876543210</td>
+                                <td>02.08.2026</td>
+                                <td>Temmuz 2026</td>
+                                <td><span class="badge success">Aktif</span></td>
+                                <td>
+                                    <button class="text-btn btn-company-detail"
+                                            data-isletme="XYZ Danışmanlık"
+                                            data-vno="9876543210"
+                                            data-sonislem="02.08.2026"
+                                            data-donem="Temmuz 2026"
+                                            data-durum="Aktif"
+                                            data-bekleyen="7 Belge"
+                                            data-kdv="Eksik Evrak Var"
+                                            data-muhtasar="Hazırlandı ✓">
+                                        Detay
+                                    </button>
+                                </td>
+                            </tr>
+                            <tr>
+                                <td><strong>Beta Lojistik</strong></td>
+                                <td>4567890123</td>
+                                <td>30.07.2026</td>
+                                <td>Temmuz 2026</td>
+                                <td><span class="badge warning">Kontrol</span></td>
+                                <td>
+                                    <button class="text-btn btn-company-detail"
+   data-isletme="Beta Lojistik"
+ data-vno="4567890123"
+ data-sonislem="30.07.2026"
+  data-donem="Temmuz 2026"
+ data-durum="Kontrol Bekliyor"
+ data-bekleyen="8 Belge"
+  data-kdv="İnceleniyor"
+  data-muhtasar="Hazırlanmadı">
+                             Detay
+                                    </button>
+                                </td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+
+        </main>
+    </div>
+
+    <div class="modal-overlay" id="addCompanyModal">
+        <div class="modal-card">
+            <div class="modal-header">
+                <h2 style="font-size:18px; margin:0; color:var(--text);">Yeni İşletme Ekle</h2>
+                <button class="modal-close" id="closeAddModal">&times;</button>
+            </div>
+            <form id="form-add-company">
+                <div style="display:flex; flex-direction:column; gap:12px; font-size:13px;">
+                    <div class="form-group">
+                        <label style="font-weight:600;">İşletme / Firma Unvanı *</label>
+                        <input class="table-input" id="add-company-name" required placeholder="Örn: Tekno Çözümler Ltd. Şti.">
+                    </div>
+                    <div style="display:grid; grid-template-columns:1fr 1fr; gap:10px;">
+                        <div class="form-group">
+                            <label style="font-weight:600;">Vergi / TC Kimlik No *</label>
+                            <input class="table-input" id="add-company-vno" required placeholder="10 veya 11 haneli">
+                        </div>
+                        <div class="form-group">
+                            <label style="font-weight:600;">Vergi Dairesi</label>
+                            <input class="table-input" id="add-company-taxoffice" placeholder="Örn: Maslak VD">
+                        </div>
+                    </div>
+                    <div style="display:grid; grid-template-columns:1fr 1fr; gap:10px;">
+                        <div class="form-group">
+                            <label style="font-weight:600;">Çalışma Dönemi</label>
+                            <select class="table-input" id="add-company-period">
+                                <option>Ağustos 2026</option>
+                                <option>Temmuz 2026</option>
+                                <option>Haziran 2026</option>
+                            </select>
+                        </div>
+                        <div class="form-group">
+                            <label style="font-weight:600;">Sorumlu Müşavir</label>
+                            <input class="table-input" placeholder="Zeynep Sel" readonly style="background:#f8fafc;">
+                        </div>
+                    </div>
+                </div>
+                <div style="display:flex; justify-content:flex-end; gap:10px; margin-top:20px; border-top:1px solid #f1f5f9; padding-top:12px;">
+                    <button type="button" class="btn btn-secondary" id="closeAddBtn">İptal</button>
+                    <button type="submit" class="btn btn-primary">Kaydet ve Bağla</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <div class="modal-overlay" id="companyModal">
+        <div class="modal-card">
+            <div class="modal-header">
+                <div>
+                    <h2 id="m-isletme-adi" style="font-size:18px; margin:0; color:var(--text);">ABC Teknoloji</h2>
+                    <span id="m-durum-badge" class="badge success" style="margin-top:4px; display:inline-block;">Aktif</span>
+                </div>
+                <button class="modal-close" id="closeModal">&times;</button>
+            </div>
+            <div class="modal-body">
+                <div class="detail-grid">
+                    <div><strong>Vergi Numarası:</strong> <br><span id="m-vno">1234567890</span></div>
+                    <div><strong>Cari Dönem:</strong> <br><span id="m-donem">Temmuz 2026</span></div>
+                    <div><strong>Son İşlem Tarihi:</strong> <br><span id="m-son-islem">03.08.2026</span></div>
+                    <div><strong>Bekleyen İşlem/Evrak:</strong> <br><span id="m-bekleyen" style="color:var(--warning); font-weight:bold;">3 Belge</span></div>
+                </div>
+
+                <h3 style="font-size:14px; margin-bottom:10px;">Dönem Beyanname Kontrolleri</h3>
+                <ul class="status-list">
+                    <li>
+                        <span>KDV-1 Beyannamesi</span>
+                        <strong id="m-kdv" style="color:var(--primary);">Hazırlandı ✓</strong>
+                    </li>
+                    <li>
+                        <span>Muhtasar ve Prim Hizmet</span>
+                        <strong id="m-muhtasar">Onay Bekliyor</strong>
+                    </li>
+                    <li>
+                        <span>Geçici Vergi Durumu</span>
+                        <strong style="color:var(--success);">Tamamlandı ✓</strong>
+                    </li>
+                </ul>
+            </div>
+            <div style="display:flex; justify-content:flex-end; gap:10px; margin-top:20px; border-top:1px solid #f1f5f9; padding-top:12px;">
+                <button class="btn btn-secondary" id="closeModalBtn">Kapat</button>
+            </div>
+        </div>
+    </div>
+
+    <script src="../assets/js/script.js"></script>
+    <script>
+        document.addEventListener('DOMContentLoaded', function () {
+            const detailModal = document.getElementById('companyModal');
+            const closeDetailModal = document.getElementById('closeModal');
+            const closeDetailBtn = document.getElementById('closeModalBtn');
+
+            function attachDetailEvents() {
+                const detailBtns = document.querySelectorAll('.btn-company-detail');
+                detailBtns.forEach(btn => {
+                    btn.onclick = function () {
+                        document.getElementById('m-isletme-adi').innerText = this.getAttribute('data-isletme');
+                        document.getElementById('m-vno').innerText = this.getAttribute('data-vno');
+                        document.getElementById('m-son-islem').innerText = this.getAttribute('data-sonislem');
+                        document.getElementById('m-donem').innerText = this.getAttribute('data-donem');
+                        document.getElementById('m-durum-badge').innerText = this.getAttribute('data-durum');
+                        document.getElementById('m-bekleyen').innerText = this.getAttribute('data-bekleyen');
+                        document.getElementById('m-kdv').innerText = this.getAttribute('data-kdv');
+                        document.getElementById('m-muhtasar').innerText = this.getAttribute('data-muhtasar');
+
+                        detailModal.classList.add('active');
+                    };
+                });
+            }
+            attachDetailEvents();
+
+            function hideDetailModal() { detailModal.classList.remove('active'); }
+            if (closeDetailModal) closeDetailModal.addEventListener('click', hideDetailModal);
+            if (closeDetailBtn) closeDetailBtn.addEventListener('click', hideDetailModal);
+
+            const addModal = document.getElementById('addCompanyModal');
+            const btnOpenAdd = document.getElementById('btn-open-add-company');
+            const closeAddModal = document.getElementById('closeAddModal');
+            const closeAddBtn = document.getElementById('closeAddBtn');
+            const formAddCompany = document.getElementById('form-add-company');
+            const companyTableBody = document.getElementById('company-table-body');
+            const statCompanyCount = document.getElementById('stat-company-count');
+
+            if (btnOpenAdd) {
+                btnOpenAdd.addEventListener('click', () => addModal.classList.add('active'));
+            }
+
+            function hideAddModal() {
+                addModal.classList.remove('active');
+            }
+
+            if (closeAddModal) closeAddModal.addEventListener('click', hideAddModal);
+            if (closeAddBtn) closeAddBtn.addEventListener('click', hideAddModal);
+
+            formAddCompany.addEventListener('submit', function (e) {
+                e.preventDefault();
+
+                const name = document.getElementById('add-company-name').value.trim();
+                const vno = document.getElementById('add-company-vno').value.trim();
+                const period = document.getElementById('add-company-period').value;
+
+                const today = '10.08.2026';
+
+                const tr = document.createElement('tr');
+                tr.innerHTML = `
+            <td><strong>${name}</strong></td>
+            <td>${vno}</td>
+            <td>${today}</td>
+            <td>${period}</td>
+            <td><span class="badge success">Aktif</span></td>
+            <td>
+              <button class="text-btn btn-company-detail"
+                      data-isletme="${name}"
+                      data-vno="${vno}"
+                      data-sonislem="${today}"
+                      data-donem="${period}"
+                      data-durum="Aktif"
+                      data-bekleyen="0 Belge"
+                      data-kdv="Hazırlanıyor"
+                      data-muhtasar="Hazırlanıyor">
+                Detay
+              </button>
+            </td>
+          `;
+
+                companyTableBody.prepend(tr);
+
+                let count = parseInt(statCompanyCount.innerText) || 12;
+                statCompanyCount.innerText = count + 1;
+
+                attachDetailEvents();
+
+                alert(`"${name}" işletmesi başarıyla sisteme bağlandı.`);
+                hideAddModal();
+                formAddCompany.reset();
+            });
+
+            const searchInput = document.getElementById('search-company');
+            searchInput.addEventListener('input', function () {
+                const q = this.value.toLowerCase().trim();
+                const rows = companyTableBody.querySelectorAll('tr');
+                rows.forEach(row => {
+                    row.style.display = row.innerText.toLowerCase().includes(q) ? '' : 'none';
+                });
+            });
+
+            window.addEventListener('click', function (e) {
+                if (e.target === detailModal) hideDetailModal();
+                if (e.target === addModal) hideAddModal();
+            });
+        });
+    </script>
+</body>
+</html>

@@ -1,0 +1,178 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Yeni Fatura Oluştur | Akıllı Muhasebe</title>
+    <link rel="stylesheet" href="../assets/css/style.css">
+</head>
+<body data-page="invoice-new">
+    <div id="sidebar-container"></div>
+    <div class="main">
+        <div id="header-container"></div>
+        <main class="content">
+
+            <div class="page-heading">
+                <div>
+                    <h1>Yeni Fatura Oluştur</h1>
+                    <p>Müşterinize manuel e-fatura veya e-arşiv faturası kesin.</p>
+                </div>
+                <div style="display:flex; gap:10px;">
+                    <a class="btn btn-secondary" href="dashboard.html"> Ana Sayfa</a>
+                    <a class="btn btn-primary" href="accounts.html"> Carilere Dön</a>
+                    <a class="btn btn-primary" href="invoices.html"> Faturalara Dön</a>
+                </div>
+            </div>
+
+            <form class="card form-card" data-demo-form data-redirect="invoices.html">
+                <div class="form-grid">
+                    <div class="form-group">
+                        <label>Fatura No</label>
+                        <input type="text" value="INV-2026-004" readonly style="background:#f8fafc;">
+                    </div>
+                    <div class="form-group">
+                        <label>Cari / Müşteri</label>
+                        <select id="select-cari">
+                            <option>ABC Teknoloji</option>
+                            <option selected>XYZ Danışmanlık</option>
+                            <option>Beta Lojistik</option>
+                            <option>Gamma Yazılım & Donanım</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label>Fatura Türü</label>
+                        <select>
+                            <option>E-Fatura</option>
+                            <option>E-Arşiv</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label>Kesim Tarihi</label>
+                        <input type="date" value="2026-08-06">
+                    </div>
+                    <div class="form-group">
+                        <label>Vade Tarihi</label>
+                        <input type="date" value="2026-09-06">
+                    </div>
+                    <div class="form-group">
+                        <label>Fatura Notu</label>
+                        <input type="text" placeholder="İsteğe bağlı not">
+                    </div>
+                </div>
+
+                <br>
+                <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:12px;">
+                    <h3 style="font-size:15px; margin:0;">Fatura Kalemleri</h3>
+                    <button type="button" class="btn btn-secondary" id="btn-add-row" style="padding:6px 12px; font-size:12px;">＋ Kalem Ekle</button>
+                </div>
+
+                <div class="table-wrap">
+                    <table class="table" id="items-table">
+                        <thead>
+                            <tr>
+                                <th style="width:40%;">AÇIKLAMA</th>
+                                <th>MİKTAR</th>
+                                <th>BİRİM FİYAT (₺)</th>
+                                <th>KDV %</th>
+                                <th>TUTAR</th>
+                                <th></th>
+                            </tr>
+                        </thead>
+                        <tbody id="items-body">
+                            <tr>
+                                <td><input class="table-input item-desc" placeholder="Ürün veya hizmet adı" value="Danışmanlık Hizmet Bedeli"></td>
+                                <td><input class="table-input item-qty" type="number" value="1" min="1"></td>
+                                <td><input class="table-input item-price" type="number" value="8750"></td>
+                                <td>
+                                    <select class="table-input item-vat">
+                                        <option value="20" selected>%20</option>
+                                        <option value="10">%10</option>
+                                        <option value="1">%1</option>
+                                        <option value="0">%0</option>
+                                    </select>
+                                </td>
+                                <td class="item-total" style="font-weight:600;">₺8.750,00</td>
+                                <td><button type="button" class="text-btn btn-delete-row" style="color:var(--danger);">Sil</button></td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+
+                <div class="form-actions" style="margin-top:24px; display:flex; justify-content:flex-end; gap:10px;">
+                    <a class="btn btn-secondary" href="invoices.html">İptal</a>
+                    <button class="btn btn-primary" type="submit">Faturayı Kaydet ve Gönder</button>
+                </div>
+            </form>
+
+        </main>
+    </div>
+
+    <script src="../assets/js/script.js"></script>
+    <script>
+        document.addEventListener('DOMContentLoaded', function () {
+          
+            const urlParams = new URLSearchParams(window.location.search);
+            const selectedCariFromUrl = urlParams.get('cari');
+            if (selectedCariFromUrl) {
+                const selectCari = document.getElementById('select-cari');
+                for (let i = 0; i < selectCari.options.length; i++) {
+                    if (selectCari.options[i].text.toLowerCase() === selectedCariFromUrl.toLowerCase()) {
+                        selectCari.selectedIndex = i;
+                        break;
+                    }
+                }
+            }
+
+          
+            const itemsBody = document.getElementById('items-body');
+            const btnAddRow = document.getElementById('btn-add-row');
+
+            function calculateTotals() {
+                const rows = itemsBody.querySelectorAll('tr');
+                rows.forEach(row => {
+                    const qty = parseFloat(row.querySelector('.item-qty').value) || 0;
+                    const price = parseFloat(row.querySelector('.item-price').value) || 0;
+                    const rowSub = qty * price;
+                    row.querySelector('.item-total').innerText = '₺' + rowSub.toLocaleString('tr-TR', { minimumFractionDigits: 2 });
+                });
+            }
+
+            itemsBody.addEventListener('input', calculateTotals);
+            itemsBody.addEventListener('change', calculateTotals);
+
+            if (btnAddRow) {
+                btnAddRow.addEventListener('click', function () {
+                    const tr = document.createElement('tr');
+                    tr.innerHTML = `
+              <td><input class="table-input item-desc" placeholder="Ürün veya hizmet adı"></td>
+              <td><input class="table-input item-qty" type="number" value="1" min="1"></td>
+              <td><input class="table-input item-price" type="number" value="0"></td>
+              <td>
+                <select class="table-input item-vat">
+                  <option value="20" selected>%20</option>
+                  <option value="10">%10</option>
+                  <option value="1">%1</option>
+                  <option value="0">%0</option>
+                </select>
+              </td>
+              <td class="item-total" style="font-weight:600;">₺0,00</td>
+              <td><button type="button" class="text-btn btn-delete-row" style="color:var(--danger);">Sil</button></td>
+            `;
+                    itemsBody.appendChild(tr);
+                });
+            }
+
+            itemsBody.addEventListener('click', function (e) {
+                if (e.target.classList.contains('btn-delete-row')) {
+                    if (itemsBody.querySelectorAll('tr').length > 1) {
+                        e.target.closest('tr').remove();
+                        calculateTotals();
+                    } else {
+                        alert('En az bir fatura kalemi bulunmalıdır.');
+                    }
+                }
+            });
+        });
+    </script>
+</body>
+</html>

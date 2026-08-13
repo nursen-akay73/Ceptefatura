@@ -1,0 +1,49 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Otomatik Fatura Şablonu | Akıllı Muhasebe</title>
+    <link rel="stylesheet" href="../assets/css/style.css">
+</head>
+<body data-page="invoice-template">
+    <div id="sidebar-container"></div>
+    <div class="main">
+        <div id="header-container"></div>
+        <main class="content">
+
+            <div class="page-heading">
+                <div>
+                    <h1>Tekrarlayan Fatura Şablonu</h1>
+                    <p>Aylık kira, aidat veya düzenli hizmetler için otomatik fatura kurgulayın.</p>
+                </div>
+                <div style="display:flex; gap:10px;">
+                    <a class="btn btn-secondary" href="dashboard.html"> Ana Sayfa</a>
+                    <a class="btn btn-primary" href="invoices.html"> Faturalara Dön</a>
+                </div>
+            </div>
+
+            <form class="card form-card" data-demo-form data-redirect="invoices.html">
+
+                <div class="form-grid">
+                    <div class="form-group"><label>Müşteri / Cari</label><select id="customer_id" name="customer_id"><option>ABC Teknoloji</option><option>XYZ Danışmanlık</option></select></div>
+                    <div class="form-group"><label>Fatura Sıklığı</label><select id="fatura_sikligi" name="fatura_sikligi"><option>Aylık</option><option>Haftalık</option><option>3 Aylık</option><option>Yıllık</option></select></div>
+                    <div class="form-group"><label>Başlangıç Tarihi</label><input type="date" id="baslangic_tarihi" name="baslangic_tarihi"></div>
+                    <div class="form-group"><label>Sonraki Fatura Tarihi</label><input type="date" id="sonraki_fatura_tarihi" name="sonraki_fatura_tarihi"></div>
+                    <div class="form-group full"><label>Fatura Açıklaması</label><input id="aciklama" name="aciklama" placeholder="Örn: Aylık Danışmanlık Hizmet Bedeli"></div>
+                    <div class="form-group"><label>Miktar</label><input type="number" id="miktar" name="miktar" value="1"></div>
+                    <div class="form-group"><label>Birim Fiyat (₺)</label><input type="number" id="birim_fiyat" name="birim_fiyat" value="0"></div>
+                    <div class="form-group"><label>KDV Oranı (%)</label><input type="number" id="kdv_orani" name="kdv_orani" value="20"></div>
+                </div>
+
+                <div class="form-actions">
+                    <a class="btn btn-secondary" href="invoices.html">İptal</a>
+                    <button class="btn btn-primary" type="submit">Otomatik Şablonu Kaydet</button>
+                </div>
+            </form>
+
+        </main>
+    </div>
+    <script src="../assets/js/script.js"></script>
+</body>
+</html>

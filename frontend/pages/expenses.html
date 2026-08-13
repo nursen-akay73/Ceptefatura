@@ -1,0 +1,61 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Giderler | Akıllı Muhasebe</title>
+    <link rel="stylesheet" href="../assets/css/style.css">
+</head>
+<body data-page="expenses">
+    <div id="sidebar-container"></div>
+    <div class="main">
+        <div id="header-container"></div>
+        <main class="content">
+
+            <div class="page-heading">
+                <div>
+                    <h1>Giderler</h1>
+                    <p>İşletmenizin giderlerini takip edin.</p>
+                </div>
+                <div style="display:flex; gap:10px;">
+                    <a class="btn btn-secondary" href="dashboard.html"> Ana Sayfa</a>
+                    <a class="btn btn-primary" href="expense-new.html"> Yeni Gider</a>
+                </div>
+            </div>
+
+            <div class="grid stats">
+                <div class="card stat-card"><span class="label">Toplam Gider</span><div class="value">₺32.000</div></div>
+                <div class="card stat-card"><span class="label">Bu Ay Belge</span><div class="value">24</div></div>
+                <div class="card stat-card"><span class="label">İndirilecek KDV</span><div class="value">₺5.760</div></div>
+                <div class="card stat-card"><span class="label">Bekleyen Belge</span><div class="value">3</div></div>
+            </div><br>
+
+            <div class="card">
+                <div class="filter-row">
+                    <input type="search" placeholder="Firma veya açıklama ara">
+                    <select>
+                        <option>Tüm Kategoriler</option>
+                        <option>Ofis</option>
+                        <option>Ulaşım</option>
+                        <option>Hizmet</option>
+                    </select>
+                </div>
+                <div class="table-wrap">
+                    <table class="table">
+                        <thead>
+                            <tr><th>TARİH</th><th>FİRMA</th><th>KATEGORİ</th><th>TUTAR</th><th>KAYNAK</th><th>DURUM</th></tr>
+                        </thead>
+                        <tbody>
+                            <tr><td>03.08.2026</td><td>ABC Ofis</td><td>Ofis</td><td>₺2.500</td><td>Manuel</td><td><span class="badge success">İşlendi</span></td></tr>
+                            <tr><td>02.08.2026</td><td>Hızlı Kargo</td><td>Ulaşım</td><td>₺850</td><td>OCR</td><td><span class="badge success">İşlendi</span></td></tr>
+                            <tr><td>01.08.2026</td><td>Teknik Servis</td><td>Hizmet</td><td>₺1.750</td><td>OCR</td><td><span class="badge warning">Kontrol Bekliyor</span></td></tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+
+        </main>
+    </div>
+    <script src="../assets/js/script.js"></script>
+</body>
+</html>

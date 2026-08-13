@@ -1,0 +1,413 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Cari Hesaplar | Akıllı Muhasebe</title>
+    <link rel="stylesheet" href="../assets/css/style.css">
+    <style>
+        .tabs {
+            display: flex;
+            gap: 8px;
+            margin-bottom: 16px;
+            border-bottom: 2px solid #e2e8f0;
+        }
+
+        .tab-btn {
+            background: none;
+            border: none;
+            padding: 10px 18px;
+            font-size: 14px;
+            font-weight: 600;
+            color: var(--muted);
+            cursor: pointer;
+            border-bottom: 2px solid transparent;
+            margin-bottom: -2px;
+            transition: all 0.2s;
+        }
+
+            .tab-btn.active {
+                color: var(--primary);
+                border-bottom-color: var(--primary);
+            }
+        .modal-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: rgba(15, 23, 42, 0.5);
+            backdrop-filter: blur(4px);
+            display: none;
+            align-items: center;
+            justify-content: center;
+            z-index: 9999;
+        }
+
+            .modal-overlay.active {
+                display: flex;
+            }
+
+        .modal-card {
+            background: #fff;
+            border-radius: 12px;
+            width: 90%;
+            max-width: 600px;
+            padding: 24px;
+            box-shadow: 0 20px 25px -5px rgba(0,0,0,0.1);
+            animation: modalIn 0.2s ease-out;
+        }
+
+        @keyframes modalIn {
+            from {
+                opacity: 0;
+                transform: scale(0.95);
+            }
+
+            to {
+                opacity: 1;
+                transform: scale(1);
+            }
+        }
+
+        .modal-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            border-bottom: 1px solid #f1f5f9;
+            padding-bottom: 12px;
+            margin-bottom: 16px;
+        }
+
+        .modal-close {
+            background: none;
+            border: none;
+            font-size: 24px;
+            cursor: pointer;
+            color: var(--muted);
+        }
+
+        .detail-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 12px;
+            font-size: 13px;
+            margin-bottom: 16px;
+            background: #f8fafc;
+            padding: 14px;
+            border-radius: 8px;
+        }
+    </style>
+</head>
+<body data-page="accounts">
+    <div id="sidebar-container"></div>
+    <div class="main">
+        <div id="header-container"></div>
+        <main class="content">
+
+            <div class="page-heading">
+                <div>
+                    <h1>Cari Hesaplar</h1>
+                    <p>Müşteri ve tedarikçi hesaplarınızı yönetin.</p>
+                </div>
+                <div style="display:flex; gap:10px;">
+                    <a href="dashboard.html" class="btn btn-secondary"> Ana Sayfa</a>
+                    <button class="btn btn-primary" id="btn-open-new"> Yeni Cari</button>
+                </div>
+            </div>
+
+            <div class="tabs">
+                <button class="tab-btn active" data-type="tum">Tüm Cariler</button>
+                <button class="tab-btn" data-type="musteri">Müşteriler</button>
+                <button class="tab-btn" data-type="tedarikci">Tedarikçiler</button>
+            </div>
+
+            <div class="card">
+
+                <div class="filter-row">
+                    <input type="search" id="search-accounts" placeholder="Cari adı, vergi no, telefon veya e-posta ara...">
+                </div>
+
+                <div class="table-wrap">
+                    <table class="table">
+                        <thead>
+                            <tr>
+                                <th>CARİ ADI</th>
+                                <th>TÜRÜ</th>
+                                <th>VERGİ NO</th>
+                                <th>TELEFON</th>
+                                <th>E-POSTA</th>
+                                <th>BAKİYE</th>
+                                <th>İŞLEM</th>
+                            </tr>
+                        </thead>
+                        <tbody id="accounts-table-body">
+                            <tr data-type="musteri">
+                                <td><strong>ABC Teknoloji</strong></td>
+                                <td><span class="badge success">Müşteri</span></td>
+                                <td>1234567890</td>
+                                <td>0555 111 22 33</td>
+                                <td>info@abcteknoloji.com</td>
+                                <td style="color:var(--success); font-weight:600;">₺25.000 Alacak</td>
+                                <td>
+                                    <button class="text-btn btn-account-detail"
+                                            data-name="ABC Teknoloji"
+                                            data-role="Müşteri"
+                                            data-vno="1234567890"
+                                            data-phone="0555 111 22 33"
+                                            data-email="info@abcteknoloji.com"
+                                            data-balance="₺25.000 Alacak"
+                                            data-address="İstanbul, Maslak Mah. No:12">
+                                        Detay
+                                    </button>
+                                </td>
+                            </tr>
+                            <tr data-type="musteri">
+                                <td><strong>XYZ Danışmanlık</strong></td>
+                                <td><span class="badge success">Müşteri</span></td>
+                                <td>9876543210</td>
+                                <td>0555 444 55 66</td>
+                                <td>info@xyz.com</td>
+                                <td style="color:var(--success); font-weight:600;">₺8.750 Alacak</td>
+                                <td>
+                                    <button class="text-btn btn-account-detail"
+                                            data-name="XYZ Danışmanlık"
+                                            data-role="Müşteri"
+                                            data-vno="9876543210"
+                                            data-phone="0555 444 55 66"
+                                            data-email="info@xyz.com"
+                                            data-balance="₺8.750 Alacak"
+                                            data-address="Ankara, Çankaya No:45">
+                                        Detay
+                                    </button>
+                                </td>
+                            </tr>
+                            <tr data-type="tedarikci">
+                                <td><strong>Beta Lojistik</strong></td>
+                                <td><span class="badge warning">Tedarikçi</span></td>
+                                <td>4567890123</td>
+                                <td>0555 777 88 99</td>
+                                <td>info@beta.com</td>
+                                <td style="color:var(--danger); font-weight:600;">₺5.400 Borç</td>
+                                <td>
+                                    <button class="text-btn btn-account-detail"
+                                            data-name="Beta Lojistik"
+                                            data-role="Tedarikçi"
+                                            data-vno="4567890123"
+                                            data-phone="0555 777 88 99"
+                                            data-email="info@beta.com"
+                                            data-balance="₺5.400 Borç"
+                                            data-address="İzmir, Bornova No:88">
+                                        Detay
+                                    </button>
+                                </td>
+                            </tr>
+                            <tr data-type="tedarikci">
+                                <td><strong>Gamma Yazılım & Donanım</strong></td>
+                                <td><span class="badge warning">Tedarikçi</span></td>
+                                <td>3322114455</td>
+                                <td>0532 999 11 22</td>
+                                <td>destek@gammayazilim.com</td>
+                                <td style="color:var(--muted); font-weight:600;">₺0,00</td>
+                                <td>
+                                    <button class="text-btn btn-account-detail"
+                                            data-name="Gamma Yazılım & Donanım"
+                                            data-role="Tedarikçi"
+                                            data-vno="3322114455"
+                                            data-phone="0532 999 11 22"
+                                            data-email="destek@gammayazilim.com"
+                                            data-balance="₺0,00"
+                                            data-address="Kocaeli, Gebze Teknopark">
+                                        Detay
+                                    </button>
+                                </td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+
+        </main>
+    </div>
+
+    <div class="modal-overlay" id="accountDetailModal">
+        <div class="modal-card">
+            <div class="modal-header">
+                <div>
+                    <h2 id="m-account-name" style="font-size:18px; margin:0; color:var(--text);">ABC Teknoloji</h2>
+                    <span id="m-account-role" class="badge success" style="margin-top:4px; display:inline-block;">Müşteri</span>
+                </div>
+                <button class="modal-close" id="closeDetailModal">&times;</button>
+            </div>
+            <div class="modal-body">
+                <div class="detail-grid">
+                    <div><strong>Vergi Numarası:</strong> <br><span id="m-account-vno">1234567890</span></div>
+                    <div><strong>Güncel Bakiye:</strong> <br><span id="m-account-balance" style="font-weight:bold;">₺25.000 Alacak</span></div>
+                    <div><strong>Telefon:</strong> <br><span id="m-account-phone">0555 111 22 33</span></div>
+                    <div><strong>E-Posta:</strong> <br><span id="m-account-email">info@abcteknoloji.com</span></div>
+                    <div style="grid-column: span 2;"><strong>Adres:</strong> <br><span id="m-account-address">İstanbul, Maslak</span></div>
+                </div>
+
+                <h3 style="font-size:14px; margin-bottom:8px;">Son Hareket Özetleri</h3>
+                <table style="width:100%; font-size:12px; border-collapse:collapse;">
+                    <thead>
+                        <tr style="background:#f8fafc; text-align:left;">
+                            <th style="padding:6px;">Tarih</th>
+                            <th style="padding:6px;">İşlem</th>
+                            <th style="padding:6px;">Tutar</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr>
+                            <td style="padding:6px; border-bottom:1px solid #f1f5f9;">03.08.2026</td>
+                            <td style="padding:6px; border-bottom:1px solid #f1f5f9;">Satış Faturası (INV-2026-001)</td>
+                            <td style="padding:6px; border-bottom:1px solid #f1f5f9;">₺12.500</td>
+                        </tr>
+                        <tr>
+                            <td style="padding:6px; border-bottom:1px solid #f1f5f9;">15.07.2026</td>
+                            <td style="padding:6px; border-bottom:1px solid #f1f5f9;">Tahsilat (Banka Havalesi)</td>
+                            <td style="padding:6px; border-bottom:1px solid #f1f5f9;">₺12.500</td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+            <div style="display:flex; justify-content:flex-end; gap:10px; margin-top:20px; border-top:1px solid #f1f5f9; padding-top:12px;">
+                <button class="btn btn-secondary" id="closeDetailBtn">Kapat</button>
+                <a class="btn btn-primary" href="invoice-new.html"> Bu Cariye Fatura Kes</a>
+            </div>
+        </div>
+    </div>
+
+    <div class="modal-overlay" id="newAccountModal">
+        <div class="modal-card">
+            <div class="modal-header">
+                <h2 style="font-size:18px; margin:0;">Yeni Cari Hesap Ekle</h2>
+                <button class="modal-close" id="closeNewModal">&times;</button>
+            </div>
+            <form id="form-new-account">
+                <div style="display:flex; flex-direction:column; gap:12px; font-size:13px;">
+                    <div class="form-group">
+                        <label style="font-weight:600;">Cari / Firma Adı *</label>
+                        <input class="table-input" id="new-name" required placeholder="Örn: Tekno Market A.Ş.">
+                    </div>
+                    <div style="display:grid; grid-template-columns:1fr 1fr; gap:10px;">
+                        <div class="form-group">
+                            <label style="font-weight:600;">Cari Türü</label>
+                            <select class="table-input" id="new-role">
+                                <option value="musteri">Müşteri</option>
+                                <option value="tedarikci">Tedarikçi</option>
+                            </select>
+                        </div>
+                        <div class="form-group">
+                            <label style="font-weight:600;">Vergi / TC No</label>
+                            <input class="table-input" id="new-vno" placeholder="10 veya 11 haneli">
+                        </div>
+                    </div>
+                    <div style="display:grid; grid-template-columns:1fr 1fr; gap:10px;">
+                        <div class="form-group">
+                            <label style="font-weight:600;">Telefon</label>
+                            <input class="table-input" id="new-phone" placeholder="05XX XXX XX XX">
+                        </div>
+                        <div class="form-group">
+                            <label style="font-weight:600;">E-Posta</label>
+                            <input class="table-input" id="new-email" type="email" placeholder="ornek@firma.com">
+                        </div>
+                    </div>
+                </div>
+                <div style="display:flex; justify-content:flex-end; gap:10px; margin-top:20px; border-top:1px solid #f1f5f9; padding-top:12px;">
+                    <button type="button" class="btn btn-secondary" id="closeNewBtn">İptal</button>
+                    <button type="submit" class="btn btn-primary">Kaydet ve Ekle</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <script src="../assets/js/script.js"></script>
+    <script>
+        document.addEventListener('DOMContentLoaded', function () {
+            const searchInput = document.getElementById('search-accounts');
+            const tabBtns = document.querySelectorAll('.tab-btn');
+            const rows = document.querySelectorAll('#accounts-table-body tr');
+
+            let activeType = 'tum';
+
+            function filterTable() {
+                const query = searchInput.value.toLowerCase().trim();
+
+                rows.forEach(row => {
+                    const rowType = row.getAttribute('data-type');
+                    const text = row.innerText.toLowerCase();
+
+                    const matchesTab = (activeType === 'tum') || (rowType === activeType);
+                    const matchesSearch = text.includes(query);
+
+                    if (matchesTab && matchesSearch) {
+                        row.style.display = '';
+                    } else {
+                        row.style.display = 'none';
+                    }
+                });
+            }
+
+            tabBtns.forEach(btn => {
+                btn.addEventListener('click', function () {
+                    tabBtns.forEach(b => b.classList.remove('active'));
+                    this.classList.add('active');
+                    activeType = this.getAttribute('data-type');
+                    filterTable();
+                });
+            });
+
+            searchInput.addEventListener('input', filterTable);
+
+            const detailModal = document.getElementById('accountDetailModal');
+            const detailBtns = document.querySelectorAll('.btn-account-detail');
+            const closeDetailModal = document.getElementById('closeDetailModal');
+            const closeDetailBtn = document.getElementById('closeDetailBtn');
+
+            detailBtns.forEach(btn => {
+                btn.addEventListener('click', function () {
+                    document.getElementById('m-account-name').innerText = this.getAttribute('data-name');
+                    document.getElementById('m-account-role').innerText = this.getAttribute('data-role');
+                    document.getElementById('m-account-vno').innerText = this.getAttribute('data-vno');
+                    document.getElementById('m-account-phone').innerText = this.getAttribute('data-phone');
+                    document.getElementById('m-account-email').innerText = this.getAttribute('data-email');
+                    document.getElementById('m-account-balance').innerText = this.getAttribute('data-balance');
+                    document.getElementById('m-account-address').innerText = this.getAttribute('data-address');
+
+                    detailModal.classList.add('active');
+                });
+            });
+
+            function hideDetailModal() { detailModal.classList.remove('active'); }
+            if (closeDetailModal) closeDetailModal.addEventListener('click', hideDetailModal);
+            if (closeDetailBtn) closeDetailBtn.addEventListener('click', hideDetailModal);
+
+     
+            const newModal = document.getElementById('newAccountModal');
+            const btnOpenNew = document.getElementById('btn-open-new');
+            const closeNewModal = document.getElementById('closeNewModal');
+            const closeNewBtn = document.getElementById('closeNewBtn');
+            const formNewAccount = document.getElementById('form-new-account');
+
+            if (btnOpenNew) {
+                btnOpenNew.addEventListener('click', () => newModal.classList.add('active'));
+            }
+            function hideNewModal() { newModal.classList.remove('active'); }
+            if (closeNewModal) closeNewModal.addEventListener('click', hideNewModal);
+            if (closeNewBtn) closeNewBtn.addEventListener('click', hideNewModal);
+
+            formNewAccount.addEventListener('submit', function (e) {
+                e.preventDefault();
+                alert('Yeni cari hesap başarıyla kaydedildi!');
+                hideNewModal();
+                formNewAccount.reset();
+            });
+            window.addEventListener('click', function (e) {
+                if (e.target === detailModal) hideDetailModal();
+                if (e.target === newModal) hideNewModal();
+            });
+        });
+    </script>
+</body>
+</html>

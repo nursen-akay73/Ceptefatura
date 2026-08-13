@@ -1,0 +1,82 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Ayarlar & Paketler | Akıllı Muhasebe</title>
+    <link rel="stylesheet" href="../assets/css/style.css">
+</head>
+<body data-page="settings">
+    <div id="sidebar-container"></div>
+    <div class="main">
+        <div id="header-container"></div>
+        <main class="content">
+            <div class="page-heading">
+                <div>
+                    <h1>Ayarlar ve Abonelik</h1>
+                    <p>İşletme bilgilerinizi, e-fatura entegrasyonunuzu ve paketinizi yönetin.</p>
+                </div>
+            </div>
+
+            <div class="tabs">
+                <a class="tab active" href="#">Abonelik & Paketler</a>
+                <a class="tab" href="#">Firma Profil Bilgileri</a>
+                <a class="tab" href="#">GİB E-Fatura Entegrasyonu</a>
+            </div>
+
+            <div class="grid three-col" style="margin-bottom:30px;">
+                <div class="card" style="border: 1px solid var(--border);">
+                    <h3>Ücretsiz Katman</h3>
+                    <p class="muted">Giriş seviyesi esnaflar için.</p>
+                    <div style="font-size:24px; font-weight:800; margin:15px 0;">₺0 <small style="font-size:12px; font-weight:normal;">/ay</small></div>
+                    <ul style="padding-left:18px; line-height:1.8; color:var(--muted); font-size:13px;">
+                        <li>Aylık 10 Fatura Kesimi</li>
+                        <li>Temel Gider Takibi</li>
+                        <li>Manuel Veri Girişi</li>
+                    </ul>
+                    <button class="btn btn-secondary" style="width:100%; justify-content:center; margin-top:15px;" disabled>Mevcut Plan</button>
+                </div>
+
+                <div class="card" style="border: 2px solid var(--primary); position:relative;">
+                    <span class="badge info" style="position:absolute; right:15px; top:15px;">Önerilen</span>
+                    <h3>KOBİ Paketi</h3>
+                    <p class="muted">Abonelikli & aktif KOBİ'ler için.</p>
+                    <div style="font-size:24px; font-weight:800; margin:15px 0; color:var(--primary)">₺299 <small style="font-size:12px; font-weight:normal; color:var(--text)">/ay</small></div>
+                    <ul style="padding-left:18px; line-height:1.8; color:var(--text); font-size:13px;">
+                        <li>Sınırsız Fatura Kesimi</li>
+                        <li>Otomatik Tekrarlayan Faturalar</li>
+                        <li>OCR Fiş Okuma & AI Kategori</li>
+                        <li>GİB E-Fatura / E-Arşiv Bağlantısı</li>
+                    </ul>
+                    <button class="btn btn-primary" style="width:100%; justify-content:center; margin-top:15px;">Paketi Yükselt</button>
+                </div>
+
+                <div class="card" style="border: 1px solid var(--border);">
+                    <h3>Muhasebeci Paketi</h3>
+                    <p class="muted">Mali müşavir ve ajanslar için.</p>
+                    <div style="font-size:24px; font-weight:800; margin:15px 0;">₺799 <small style="font-size:12px; font-weight:normal;">/ay</small></div>
+                    <ul style="padding-left:18px; line-height:1.8; color:var(--muted); font-size:13px;">
+                        <li>Çoklu Müşteri Yönetimi</li>
+                        <li>Muhasebeci Özel Paneli</li>
+                        <li>Toplu Belge Onaylama</li>
+                        <li>Öncelikli Destek</li>
+                    </ul>
+                    <button class="btn btn-secondary" style="width:100%; justify-content:center; margin-top:15px;">İletişime Geç</button>
+                </div>
+            </div>
+
+            <div class="card form-card">
+                <div class="card-header"><h2>GİB E-Fatura Entegratör Ayarları</h2></div>
+                <div class="form-grid">
+                    <div class="form-group"><label>Entegratör Firma</label><select><option>İzibiz</option><option>Foriba / Sovos</option><option>Trendyol / Uyumsoft</option></select></div>
+                    <div class="form-group"><label>API Kullanıcı Adı</label><input type="text" placeholder="GİB Kullanıcı Adı"></div>
+                    <div class="form-group full"><label>API Anahtarı (Secret Key)</label><input type="password" placeholder="••••••••••••••••"></div>
+                </div>
+                <div class="form-actions"><button class="btn btn-primary">Entegrasyonu Kaydet</button></div>
+            </div>
+
+        </main>
+    </div>
+    <script src="../assets/js/script.js"></script>
+</body>
+</html>

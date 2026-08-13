@@ -387,6 +387,59 @@ async function main() {
     assert(body[0].cari_adi === "Örnek Müşteri A.Ş.", "cari_adi join çalışmıyor");
   });
 
+  // --- Dashboard (gelir/tahsilat) ---
+  let invoiceWithVade;
+
+  await step("GET /api/dashboard (token yok) -> 401", async () => {
+    const { status } = await request(app, { method: "GET", path: "/api/dashboard" });
+    assert(status === 401, `status ${status}, 401 bekleniyordu`);
+  });
+
+  await step("3. fatura -> vade tarihli, dashboard testi için", async () => {
+    const vade = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString().slice(0, 10);
+    const { status, body } = await request(app, {
+      method: "POST",
+      path: "/api/invoices",
+      headers: { authorization: `Bearer ${token}` },
+      body: {
+        cari_id: cariId,
+        fatura_turu: "E-Fatura",
+        kesim_tarihi: new Date().toISOString().slice(0, 10),
+        vade_tarihi: vade,
+        kalemler: [{ aciklama: "Vadeli hizmet", miktar: 1, birim_fiyat: 1000, kdv_orani: 20 }],
+      },
+    });
+    assert(status === 201, `status ${status}`);
+    assert(body.tutar === 1200, `tutar 1200 bekleniyordu, ${body.tutar} geldi`);
+    invoiceWithVade = body;
+  });
+
+  await step("GET /api/dashboard -> bu_ay_gelir ve bekleyen_tahsilat doğru", async () => {
+    const { status, body } = await request(app, {
+      method: "GET",
+      path: "/api/dashboard",
+      headers: { authorization: `Bearer ${token}` },
+    });
+    assert(status === 200, `status ${status}: ${JSON.stringify(body)}`);
+    // İptal edilen ilk fatura (1530 TL) hariç tutulmalı; 2. fatura (120 TL, Bekliyor,
+    // vadesiz) ve 3. fatura (1200 TL, Bekliyor, vadeli) bu ay kesildiği için dahil olmalı.
+    assert(body.bu_ay_gelir === 1320, `bu_ay_gelir 1320 bekleniyordu, ${body.bu_ay_gelir} geldi`);
+    assert(
+      body.bekleyen_tahsilat === 1320,
+      `bekleyen_tahsilat 1320 bekleniyordu, ${body.bekleyen_tahsilat} geldi`
+    );
+    assert(Array.isArray(body.vadesi_yaklasan_faturalar), "vadesi_yaklasan_faturalar dizi olmalı");
+    assert(
+      body.vadesi_yaklasan_faturalar.some((i) => i.id === invoiceWithVade.id),
+      "vade tarihli fatura vadesi yaklaşanlar listesinde yok"
+    );
+    assert(
+      !body.vadesi_yaklasan_faturalar.some((i) => i.id === invoiceId),
+      "vadesiz/iptal fatura yanlışlıkla listede"
+    );
+    assert(body.bu_ay_gider === null, "bu_ay_gider henüz null olmalı (Şeyma'yı bekliyor)");
+  });
+
   await step("DELETE /api/accounts/:id -> 204 (başka kullanıcı için 404)", async () => {
     const { status: badStatus } = await request(app, {
       method: "DELETE",

@@ -207,6 +207,33 @@ async function handleQuery(rawText, params = []) {
     return { rows: [row], rowCount: 1 };
   }
 
+  // ================= DASHBOARD (gelir/tahsilat) =================
+  if (text.startsWith("SELECT COALESCE(SUM(tutar), 0) AS toplam FROM invoices")) {
+    const userId = params[0];
+    let rows = store.invoices.filter((i) => eqId(i.user_id, userId));
+    if (text.includes("EXTRACT(MONTH")) {
+      const [, ay, yil] = params;
+      rows = rows.filter((i) => {
+        const d = new Date(i.kesim_tarihi);
+        return i.durum !== "İptal" && d.getMonth() + 1 === Number(ay) && d.getFullYear() === Number(yil);
+      });
+    } else if (text.includes("durum = 'Bekliyor'")) {
+      rows = rows.filter((i) => i.durum === "Bekliyor");
+    }
+    const toplam = rows.reduce((s, i) => s + Number(i.tutar), 0);
+    return { rows: [{ toplam }], rowCount: 1 };
+  }
+
+  if (text.startsWith("SELECT id, fatura_no, vade_tarihi, tutar FROM invoices")) {
+    const userId = params[0];
+    const rows = store.invoices
+      .filter((i) => eqId(i.user_id, userId) && i.durum === "Bekliyor" && i.vade_tarihi != null)
+      .sort((a, b) => (a.vade_tarihi < b.vade_tarihi ? -1 : 1))
+      .slice(0, 5)
+      .map((i) => ({ id: i.id, fatura_no: i.fatura_no, vade_tarihi: i.vade_tarihi, tutar: i.tutar }));
+    return { rows, rowCount: rows.length };
+  }
+
   // ================= INVOICES =================
   if (text.startsWith("SELECT COUNT(*)::INT AS ADET FROM INVOICES") || text.startsWith("SELECT COUNT(*)::int AS adet FROM invoices")) {
     const [userId, year] = params;

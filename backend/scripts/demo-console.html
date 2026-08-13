@@ -1,0 +1,424 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+<meta charset="UTF-8" />
+<title>Ceptefatura — API Demo Konsolu (Yüksel)</title>
+<style>
+  :root {
+    --bg: #0f1420;
+    --panel: #161d2e;
+    --panel-2: #1d2740;
+    --border: #2a3550;
+    --text: #e7ecf7;
+    --muted: #93a0bd;
+    --accent: #5b8cff;
+    --ok: #34c98c;
+    --err: #ff6b6b;
+    --warn: #f5b544;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    font-family: -apple-system, "Segoe UI", Roboto, Arial, sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    padding: 24px;
+  }
+  h1 { font-size: 20px; margin: 0 0 4px; }
+  .sub { color: var(--muted); margin: 0 0 20px; font-size: 13px; }
+  .grid {
+    display: grid;
+    grid-template-columns: 340px 1fr;
+    gap: 16px;
+    align-items: start;
+  }
+  .col { display: flex; flex-direction: column; gap: 16px; }
+  .card {
+    background: var(--panel);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 16px;
+  }
+  .card h2 {
+    font-size: 13px;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    color: var(--muted);
+    margin: 0 0 12px;
+  }
+  label { display: block; font-size: 12px; color: var(--muted); margin: 8px 0 4px; }
+  input, select {
+    width: 100%;
+    padding: 8px 10px;
+    background: var(--panel-2);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    color: var(--text);
+    font-size: 13px;
+  }
+  button {
+    cursor: pointer;
+    border: none;
+    border-radius: 6px;
+    padding: 9px 14px;
+    font-size: 13px;
+    font-weight: 600;
+    background: var(--accent);
+    color: white;
+    margin-top: 10px;
+  }
+  button.secondary { background: var(--panel-2); border: 1px solid var(--border); color: var(--text); }
+  button.danger { background: #3a1f22; color: var(--err); border: 1px solid #5c2a2e; }
+  button.small { padding: 5px 9px; font-size: 12px; margin: 0 4px 0 0; }
+  button:disabled { opacity: 0.4; cursor: not-allowed; }
+  .row { display: flex; gap: 8px; }
+  .row > * { flex: 1; }
+  .status {
+    display: inline-flex; align-items: center; gap: 6px;
+    font-size: 12px; padding: 4px 10px; border-radius: 20px;
+    background: var(--panel-2); border: 1px solid var(--border);
+  }
+  .dot { width: 8px; height: 8px; border-radius: 50%; background: var(--muted); }
+  .dot.ok { background: var(--ok); }
+  .dot.err { background: var(--err); }
+  table { width: 100%; border-collapse: collapse; font-size: 13px; }
+  th, td { text-align: left; padding: 8px 6px; border-bottom: 1px solid var(--border); }
+  th { color: var(--muted); font-weight: 500; font-size: 11px; text-transform: uppercase; }
+  .badge { padding: 2px 8px; border-radius: 20px; font-size: 11px; font-weight: 600; }
+  .badge.Bekliyor { background: #3a3320; color: var(--warn); }
+  .badge.Ödendi { background: #16352a; color: var(--ok); }
+  .badge.İptal { background: #3a1f22; color: var(--err); }
+  .badge.Gecikti { background: #3a2320; color: #ff9a6b; }
+  .kalem-row { display: grid; grid-template-columns: 2fr 1fr 1fr 1fr auto; gap: 6px; align-items: center; margin-bottom: 6px; }
+  .kalem-row input { padding: 6px 8px; font-size: 12px; }
+  .kalem-row button { margin: 0; padding: 6px 8px; }
+  .total-line { display: flex; justify-content: space-between; padding: 10px 0 0; font-size: 14px; }
+  .total-line b { color: var(--ok); }
+  pre {
+    background: #0a0e17; border: 1px solid var(--border); border-radius: 6px;
+    padding: 10px; font-size: 11px; max-height: 220px; overflow: auto; white-space: pre-wrap;
+    word-break: break-all;
+  }
+  .muted { color: var(--muted); font-size: 12px; }
+  .empty { color: var(--muted); font-size: 13px; padding: 16px 0; text-align: center; }
+  .kpis { display: flex; gap: 12px; margin-bottom: 12px; }
+  .kpi { flex: 1; background: var(--panel-2); border: 1px solid var(--border); border-radius: 8px; padding: 10px 12px; }
+  .kpi .n { font-size: 20px; font-weight: 700; }
+  .kpi .l { font-size: 11px; color: var(--muted); text-transform: uppercase; }
+</style>
+</head>
+<body>
+
+<h1>Ceptefatura — API Demo Konsolu</h1>
+<p class="sub">Yüksel'in auth / cari / fatura endpoint'lerini gerçek çalışan sunucuya karşı elle test eder. Sadece geliştirme aracıdır, ürün arayüzü değildir.</p>
+
+<div class="row" style="max-width:520px; margin-bottom:16px; align-items:center;">
+  <input id="baseUrl" value="http://localhost:3000" />
+  <button class="secondary" style="margin-top:0; white-space:nowrap;" onclick="checkHealth()">Bağlantıyı Test Et</button>
+  <span id="healthStatus" class="status"><span class="dot"></span> kontrol edilmedi</span>
+</div>
+
+<div class="grid">
+  <div class="col">
+
+    <div class="card">
+      <h2>1. Hesap</h2>
+      <label>Ad Soyad</label>
+      <input id="reg_ad" value="Yüksel Test" />
+      <label>İşletme Adı</label>
+      <input id="reg_isletme" value="Demo İşletmesi" />
+      <label>Email</label>
+      <input id="reg_email" value="" placeholder="otomatik doldurulur" />
+      <label>Şifre</label>
+      <input id="reg_sifre" type="password" value="sifre123" />
+      <div class="row">
+        <button onclick="register()">Kayıt Ol</button>
+        <button class="secondary" onclick="login()">Giriş Yap</button>
+      </div>
+      <p class="muted" id="authState" style="margin-top:10px;">Giriş yapılmadı</p>
+    </div>
+
+    <div class="card">
+      <h2>2. Cari</h2>
+      <label>Cari Adı</label>
+      <input id="cari_adi" value="Örnek Müşteri A.Ş." />
+      <label>Vergi No</label>
+      <input id="cari_vergi" value="1234567890" />
+      <button onclick="createCari()">Cari Oluştur</button>
+      <p class="muted" id="cariState" style="margin-top:10px;">Henüz cari yok</p>
+    </div>
+
+  </div>
+
+  <div class="col">
+
+    <div class="card">
+      <div class="kpis">
+        <div class="kpi"><div class="n" id="kpiCount">0</div><div class="l">Fatura</div></div>
+        <div class="kpi"><div class="n" id="kpiTotal">0 ₺</div><div class="l">Toplam Tutar</div></div>
+        <div class="kpi"><div class="n" id="kpiPending">0 ₺</div><div class="l">Bekleyen Tahsilat</div></div>
+      </div>
+
+      <h2>3. Yeni Fatura</h2>
+      <div class="row">
+        <div>
+          <label>Cari</label>
+          <select id="fat_cari"><option value="">— önce cari oluşturun —</option></select>
+        </div>
+        <div>
+          <label>Fatura Türü</label>
+          <select id="fat_turu"><option>E-Fatura</option><option>E-Arşiv</option></select>
+        </div>
+        <div>
+          <label>Kesim Tarihi</label>
+          <input id="fat_tarih" type="date" />
+        </div>
+      </div>
+
+      <label style="margin-top:14px;">Kalemler</label>
+      <div id="kalemler"></div>
+      <button class="secondary small" onclick="addKalemRow()">+ Kalem Ekle</button>
+
+      <div class="total-line">
+        <span class="muted">Tahmini toplam (backend'de yeniden hesaplanır) ≈ <span id="tahminiToplam">0.00</span> ₺</span>
+      </div>
+
+      <button onclick="createInvoice()" style="width:100%;">Fatura Oluştur</button>
+      <p class="muted" id="invoiceCreateResult" style="margin-top:8px;"></p>
+    </div>
+
+    <div class="card">
+      <h2>4. Fatura Listesi (backend'den canlı)</h2>
+      <div id="invoiceTableWrap"><p class="empty">Henüz fatura yok</p></div>
+    </div>
+
+    <div class="card">
+      <h2>Ham API Yanıtı (son çağrı)</h2>
+      <pre id="rawResponse">—</pre>
+    </div>
+
+  </div>
+</div>
+
+<script>
+let token = null;
+let kalemCount = 0;
+
+function baseUrl() {
+  return document.getElementById("baseUrl").value.replace(/\/$/, "");
+}
+
+function showRaw(label, data) {
+  document.getElementById("rawResponse").textContent =
+    `${label}\n\n` + JSON.stringify(data, null, 2);
+}
+
+async function api(method, path, body) {
+  const headers = { "Content-Type": "application/json" };
+  if (token) headers.Authorization = `Bearer ${token}`;
+  const res = await fetch(baseUrl() + path, {
+    method,
+    headers,
+    body: body ? JSON.stringify(body) : undefined,
+  });
+  let data = null;
+  try { data = await res.json(); } catch { /* boş gövde olabilir */ }
+  showRaw(`${method} ${path} -> ${res.status}`, data);
+  if (!res.ok) throw new Error((data && data.error) || `HTTP ${res.status}`);
+  return data;
+}
+
+async function checkHealth() {
+  const el = document.getElementById("healthStatus");
+  try {
+    await api("GET", "/api/health");
+    el.innerHTML = '<span class="dot ok"></span> bağlı';
+  } catch (err) {
+    el.innerHTML = '<span class="dot err"></span> bağlanamadı';
+    alert("Sunucuya ulaşılamıyor. `npm run dev:mock` (veya `npm run dev`) çalışıyor mu? Adres doğru mu?\n\n" + err.message);
+  }
+}
+
+async function register() {
+  const email = document.getElementById("reg_email").value || `demo-${Date.now()}@ceptefatura.test`;
+  document.getElementById("reg_email").value = email;
+  try {
+    const data = await api("POST", "/api/auth/register", {
+      ad_soyad: document.getElementById("reg_ad").value,
+      isletme_adi: document.getElementById("reg_isletme").value,
+      email,
+      sifre: document.getElementById("reg_sifre").value,
+      sifre_tekrar: document.getElementById("reg_sifre").value,
+    });
+    token = data.token;
+    document.getElementById("authState").textContent = `✓ Kayıt olundu ve giriş yapıldı: ${data.user.email}`;
+    refreshInvoices();
+  } catch (err) {
+    alert("Kayıt başarısız: " + err.message);
+  }
+}
+
+async function login() {
+  const email = document.getElementById("reg_email").value;
+  if (!email) return alert("Önce Kayıt Ol ile bir hesap oluşturun (ya da email girin).");
+  try {
+    const data = await api("POST", "/api/auth/login", {
+      email,
+      sifre: document.getElementById("reg_sifre").value,
+    });
+    token = data.token;
+    document.getElementById("authState").textContent = `✓ Giriş yapıldı: ${data.user.email}`;
+    refreshInvoices();
+  } catch (err) {
+    alert("Giriş başarısız: " + err.message);
+  }
+}
+
+async function createCari() {
+  if (!token) return alert("Önce kayıt olun / giriş yapın.");
+  try {
+    const cari = await api("POST", "/api/accounts", {
+      cari_adi: document.getElementById("cari_adi").value,
+      vergi_no: document.getElementById("cari_vergi").value,
+    });
+    document.getElementById("cariState").textContent = `✓ Oluşturuldu: #${cari.id} — ${cari.cari_adi}`;
+    const sel = document.getElementById("fat_cari");
+    const opt = document.createElement("option");
+    opt.value = cari.id;
+    opt.textContent = `#${cari.id} — ${cari.cari_adi}`;
+    sel.appendChild(opt);
+    sel.value = cari.id;
+  } catch (err) {
+    alert("Cari oluşturulamadı: " + err.message);
+  }
+}
+
+function addKalemRow() {
+  kalemCount++;
+  const wrap = document.getElementById("kalemler");
+  const row = document.createElement("div");
+  row.className = "kalem-row";
+  row.dataset.id = kalemCount;
+  row.innerHTML = `
+    <input placeholder="Açıklama" class="k-aciklama" value="Danışmanlık" />
+    <input type="number" placeholder="Miktar" class="k-miktar" value="1" min="0.01" step="0.01" oninput="updateTahminiToplam()" />
+    <input type="number" placeholder="Birim Fiyat" class="k-fiyat" value="1000" min="0" step="0.01" oninput="updateTahminiToplam()" />
+    <input type="number" placeholder="KDV %" class="k-kdv" value="20" min="0" step="1" oninput="updateTahminiToplam()" />
+    <button class="secondary small" onclick="this.parentElement.remove(); updateTahminiToplam();">✕</button>
+  `;
+  wrap.appendChild(row);
+  updateTahminiToplam();
+}
+
+function readKalemler() {
+  return Array.from(document.querySelectorAll(".kalem-row")).map((row) => ({
+    aciklama: row.querySelector(".k-aciklama").value,
+    miktar: Number(row.querySelector(".k-miktar").value),
+    birim_fiyat: Number(row.querySelector(".k-fiyat").value),
+    kdv_orani: Number(row.querySelector(".k-kdv").value),
+  }));
+}
+
+function updateTahminiToplam() {
+  const toplam = readKalemler().reduce((sum, k) => {
+    const ara = (k.miktar || 0) * (k.birim_fiyat || 0);
+    return sum + ara + ara * ((k.kdv_orani || 0) / 100);
+  }, 0);
+  document.getElementById("tahminiToplam").textContent = toplam.toFixed(2);
+}
+
+async function createInvoice() {
+  if (!token) return alert("Önce kayıt olun / giriş yapın.");
+  const cariId = document.getElementById("fat_cari").value;
+  if (!cariId) return alert("Önce bir cari oluşturup seçin.");
+  const kalemler = readKalemler();
+  if (kalemler.length === 0) return alert("En az bir kalem ekleyin.");
+
+  try {
+    const invoice = await api("POST", "/api/invoices", {
+      cari_id: Number(cariId),
+      fatura_turu: document.getElementById("fat_turu").value,
+      kesim_tarihi: document.getElementById("fat_tarih").value || new Date().toISOString().slice(0, 10),
+      kalemler,
+    });
+    document.getElementById("invoiceCreateResult").innerHTML =
+      `✓ <b style="color:var(--ok)">${invoice.fatura_no}</b> oluşturuldu — backend'in hesapladığı gerçek toplam: <b style="color:var(--ok)">${invoice.tutar} ₺</b>`;
+    refreshInvoices();
+  } catch (err) {
+    alert("Fatura oluşturulamadı: " + err.message);
+  }
+}
+
+async function setDurum(id, durum) {
+  try {
+    await api("PUT", `/api/invoices/${id}`, { durum });
+    refreshInvoices();
+  } catch (err) {
+    alert("Güncellenemedi: " + err.message);
+  }
+}
+
+async function cancelInvoice(id) {
+  try {
+    await api("DELETE", `/api/invoices/${id}`);
+    refreshInvoices();
+  } catch (err) {
+    alert("İptal edilemedi: " + err.message);
+  }
+}
+
+async function refreshInvoices() {
+  if (!token) return;
+  try {
+    const invoices = await api("GET", "/api/invoices");
+    renderInvoices(invoices);
+  } catch (err) {
+    // sessiz geç — health kontrolüyle zaten görünür
+  }
+}
+
+function renderInvoices(invoices) {
+  const wrap = document.getElementById("invoiceTableWrap");
+  document.getElementById("kpiCount").textContent = invoices.length;
+  document.getElementById("kpiTotal").textContent =
+    invoices.reduce((s, i) => s + Number(i.tutar), 0).toFixed(2) + " ₺";
+  document.getElementById("kpiPending").textContent =
+    invoices.filter((i) => i.durum === "Bekliyor").reduce((s, i) => s + Number(i.tutar), 0).toFixed(2) + " ₺";
+
+  if (invoices.length === 0) {
+    wrap.innerHTML = '<p class="empty">Henüz fatura yok — yukarıdan bir tane oluşturun</p>';
+    return;
+  }
+
+  const rows = invoices
+    .map(
+      (i) => `
+    <tr>
+      <td>${i.fatura_no}</td>
+      <td>${i.cari_adi}</td>
+      <td>${i.fatura_turu}</td>
+      <td>${i.tutar} ₺</td>
+      <td><span class="badge ${i.durum}">${i.durum}</span></td>
+      <td>
+        <button class="secondary small" onclick="setDurum(${i.id}, 'Ödendi')">Ödendi yap</button>
+        <button class="danger small" onclick="cancelInvoice(${i.id})">İptal et</button>
+      </td>
+    </tr>`
+    )
+    .join("");
+
+  wrap.innerHTML = `
+    <table>
+      <thead><tr><th>Fatura No</th><th>Cari</th><th>Tür</th><th>Tutar</th><th>Durum</th><th></th></tr></thead>
+      <tbody>${rows}</tbody>
+    </table>`;
+}
+
+// başlangıç durumu
+document.getElementById("fat_tarih").valueAsDate = new Date();
+addKalemRow();
+checkHealth();
+</script>
+
+</body>
+</html>

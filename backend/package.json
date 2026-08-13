@@ -1,0 +1,23 @@
+{
+  "name": "ceptefatura-backend",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Ceptefatura API iskeleti — fatura (Yüksel) ve gider (Şeyma)",
+  "main": "src/index.js",
+  "scripts": {
+    "start": "node src/index.js",
+    "dev": "node --watch src/index.js",
+    "dev:mock": "node -e \"process.env.MOCK_DB='true'; process.env.JWT_SECRET = process.env.JWT_SECRET || 'mock-gelistirme-anahtari-guvenli-degil'; require('./src/index.js')\"",
+    "test": "node src/modules/invoices/invoices.calculations.test.js",
+    "test:mock": "node scripts/test-mock-integration.js",
+    "test:api": "node scripts/test-api.js"
+  },
+  "dependencies": {
+    "bcryptjs": "^2.4.3",
+    "cors": "^2.8.5",
+    "dotenv": "^16.4.5",
+    "express": "^4.21.2",
+    "jsonwebtoken": "^9.0.2",
+    "pg": "^8.13.1"
+  }
+}

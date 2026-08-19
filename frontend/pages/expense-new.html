@@ -33,19 +33,23 @@
                 </div>
             </div>
 
-            <form class="card form-card" data-demo-form data-redirect="expenses.html">
+            <form class="card form-card" data-demo-form data-redirect="expenses.html" data-toast="Gider kaydedildi">
                 <div class="form-grid">
                     <div class="form-group">
-                        <label>Tarih</label>
-                        <input type="date" value="2026-08-06">
+                        <label>Firma</label>
+                        <input type="text" id="gider-firma" placeholder="Tedarikçi / firma adı">
                     </div>
                     <div class="form-group">
                         <label>Tutar (₺)</label>
-                        <input type="number" step="0.01" placeholder="0.00">
+                        <input type="number" id="gider-tutar" step="0.01" placeholder="0.00">
+                    </div>
+                    <div class="form-group">
+                        <label>KDV (₺)</label>
+                        <input type="number" id="gider-kdv" step="0.01" placeholder="0.00">
                     </div>
                     <div class="form-group">
                         <label>Kategori</label>
-                        <select>
+                        <select id="gider-kategori">
                             <option>Ofis</option>
                             <option>Ulaşım</option>
                             <option>Hizmet</option>
@@ -55,24 +59,33 @@
                     </div>
                     <div class="form-group">
                         <label>Kaynak</label>
-                        <select>
+                        <select id="gider-kaynak">
                             <option>Manuel</option>
                             <option>OCR</option>
                             <option>Banka Entegrasyonu</option>
                         </select>
                     </div>
+                    <div class="form-group">
+                        <label>Tarih</label>
+                        <input type="date" id="gider-tarih" value="2026-08-06">
+                    </div>
                     <div class="form-group" style="grid-column: span 2;">
                         <label>Açıklama</label>
-                        <textarea placeholder="Gider detay açıklaması"></textarea>
+                        <div class="input-mic">
+                            <textarea id="gider_aciklama" placeholder="Konuşun, açıklama yazılsın..."></textarea>
+                            <button type="button" class="mic-btn textarea-mic" title="Sesle yaz">🎤</button>
+                        </div>
                     </div>
                 </div>
 
                 <br>
                 <div class="form-group">
                     <label>Fiş / Belge</label>
-                    <div style="border: 2px dashed #cbd5e1; border-radius: 8px; padding: 20px; text-align: center; background: #f8fafc;">
-                        <p class="muted" style="margin-bottom: 10px;">Fiş veya belge görselini seçin</p>
-                        <input type="file" accept="image/*,.pdf">
+                    <div class="dropzone" id="ocr-dropzone">
+                        <p class="muted" style="margin-bottom: 8px;">Fişi buraya sürükleyin veya seçin</p>
+                        <input type="file" id="ocr-file" accept="image/*,.pdf">
+                        <p class="muted" id="ocr-status" style="margin-top:8px; display:none;">Tutar ve KDV taranıyor...</p>
+                        <div class="ocr-progress" id="ocr-progress"><span></span></div>
                     </div>
                 </div>
 

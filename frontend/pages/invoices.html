@@ -129,7 +129,7 @@
                 </div>
 
                 <div class="table-wrap">
-                    <table class="table">
+                    <table class="table table-cards">
                         <thead>
                             <tr>
                                 <th>FATURA NO</th>
@@ -137,7 +137,7 @@
                                 <th>FATURA TÜRÜ</th>
                                 <th>TARİH</th>
                                 <th>VADE</th>
-                                <th>TUTAR</th>
+                                <th class="money">TUTAR</th>
                                 <th>DURUM</th>
                                 <th>İŞLEM</th>
                             </tr>
@@ -149,7 +149,7 @@
                                 <td>E-Fatura</td>
                                 <td>03.08.2026</td>
                                 <td>03.09.2026</td>
-                                <td>₺12.500</td>
+                                <td class="money">₺12.500,00</td>
                                 <td><span class="badge success">Ödendi</span></td>
                                 <td><button class="text-btn btn-detail" data-no="INV-2026-001" data-cari="ABC Teknoloji" data-turu="E-Fatura" data-tarih="03.08.2026" data-tutar="₺12.500" data-durum="Ödendi">Detay</button></td>
                             </tr>
@@ -159,7 +159,7 @@
                                 <td>E-Arşiv</td>
                                 <td>01.08.2026</td>
                                 <td>10.08.2026</td>
-                                <td>₺8.750</td>
+                                <td class="money">₺8.750,00</td>
                                 <td><span class="badge warning">Bekliyor</span></td>
                                 <td><button class="text-btn btn-detail" data-no="INV-2026-002" data-cari="XYZ Danışmanlık" data-turu="E-Arşiv" data-tarih="01.08.2026" data-tutar="₺8.750" data-durum="Bekliyor">Detay</button></td>
                             </tr>
@@ -169,7 +169,7 @@
                                 <td>E-Fatura</td>
                                 <td>28.07.2026</td>
                                 <td>28.07.2026</td>
-                                <td>₺5.400</td>
+                                <td class="money">₺5.400,00</td>
                                 <td><span class="badge danger">Gecikti</span></td>
                                 <td><button class="text-btn btn-detail" data-no="INV-2026-003" data-cari="Beta Lojistik" data-turu="E-Fatura" data-tarih="28.07.2026" data-tutar="₺5.400" data-durum="Gecikti">Detay</button></td>
                             </tr>
@@ -179,7 +179,7 @@
                                 <td>E-Arşiv</td>
                                 <td>04.08.2026</td>
                                 <td>20.08.2026</td>
-                                <td>₺14.200</td>
+                                <td class="money">₺14.200,00</td>
                                 <td><span class="badge warning">Bekliyor</span></td>
                                 <td><button class="text-btn btn-detail" data-no="INV-2026-004" data-cari="Delta Mimarlık" data-turu="E-Arşiv" data-tarih="04.08.2026" data-tutar="₺14.200" data-durum="Bekliyor">Detay</button></td>
                             </tr>
@@ -189,12 +189,18 @@
                                 <td>E-Fatura</td>
                                 <td>25.07.2026</td>
                                 <td>15.08.2026</td>
-                                <td>₺22.000</td>
+                                <td class="money">₺22.000,00</td>
                                 <td><span class="badge success">Ödendi</span></td>
                                 <td><button class="text-btn btn-detail" data-no="INV-2026-005" data-cari="Zirve Enerji" data-turu="E-Fatura" data-tarih="25.07.2026" data-tutar="₺22.000" data-durum="Ödendi">Detay</button></td>
                             </tr>
                         </tbody>
                     </table>
+                </div>
+                <div class="empty-state" data-empty-for="#invoice-table-body">
+                    <div class="empty-icon">▤</div>
+                    <p data-empty-none>Henüz fatura kesmediniz. 2 dakikada ilk faturanızı oluşturun.</p>
+                    <p data-empty-filter hidden>Aramanıza uygun fatura bulunamadı.</p>
+                    <a class="btn btn-primary" href="invoice-new.html">+ Yeni Fatura Kes</a>
                 </div>
             </div>
 
@@ -202,7 +208,7 @@
     </div>
 
     
-    <div class="modal-overlay" id="invoiceModal">
+    <div class="modal-overlay drawer" id="invoiceModal">
         <div class="modal-card">
             <div class="modal-header">
                 <div>
@@ -247,7 +253,7 @@
             </div>
             <div style="display:flex; justify-content:flex-end; gap:10px; margin-top:20px; border-top:1px solid #f1f5f9; padding-top:12px;">
                 <button class="btn btn-secondary" id="closeModalBtn">Kapat</button>
-                <button class="btn btn-primary" onclick="window.print()"> PDF İndir / Yazdır</button>
+                <button class="btn btn-primary" type="button" id="btn-pdf-invoice">PDF İndir</button>
             </div>
         </div>
     </div>

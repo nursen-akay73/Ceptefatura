@@ -3,25 +3,49 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Giriş Yap | Akıllı Muhasebe</title>
+    <title>Giriş Yap | CepteFatura</title>
     <link rel="stylesheet" href="../assets/css/style.css">
+    <link rel="icon" href="../assets/img/logo-icon.png">
 </head>
-<body class="auth-page">
-    <div class="auth-box">
-        <div class="auth-brand">
-            <h1>Akıllı Muhasebe</h1>
-            <p>Finansal yönetiminizi kolaylaştırın</p>
-        </div>
-        <form data-demo-form data-redirect="dashboard.html">
-            <div class="form-group"><label>E-posta</label><input type="email" id="email" name="email" placeholder="ornek@email.com" required></div>
-            <div class="form-group"><label>Şifre</label><input type="password" id="sifre" name="sifre" placeholder="••••••••" required></div>
-            <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:18px;font-size:12px">
-                <label><input type="checkbox" id="beni_hatirla" name="beni_hatirla"> Beni hatırla</label>
-                <a href="#" style="color:var(--primary)">Şifremi unuttum</a>
+<body class="auth-page auth-split">
+    <div id="app-splash" class="app-splash" aria-hidden="true">
+        <div class="splash-inner">
+            <div class="splash-logo-wrap">
+                <img class="splash-logo" src="../assets/img/logo.png" alt="CepteFatura">
             </div>
-            <button class="btn btn-primary" type="submit">Giriş Yap</button>
-        </form>
-        <div class="auth-footer">Hesabınız yok mu? <a href="register.html">Ücretsiz Kayıt Ol</a></div>
+            <div class="splash-skeleton">
+                <div class="sk-line"></div>
+                <div class="sk-line"></div>
+                <div class="sk-line"></div>
+                <div class="sk-check"></div>
+            </div>
+        </div>
+    </div>
+    <div class="auth-shell">
+        <aside class="auth-panel">
+            <img src="../assets/img/logo-icon.png" alt="" width="48" height="48">
+            <h2>2 dakikada e-fatura kesin, muhasebecinizle senkronize kalın</h2>
+            <p>KOBİ ve esnaf için ferah, mavi ve anlaşılır muhasebe. Fatura, gider ve cari tek yerde; mali müşaviriniz de aynı panele bağlanır.</p>
+        </aside>
+        <div class="auth-box">
+            <div class="auth-brand">
+                <img class="brand-logo" src="../assets/img/logo.png" alt="CepteFatura">
+                <p>Hesabınıza giriş yapın</p>
+            </div>
+            <form data-auth-form="login">
+                <div class="form-group"><label>E-posta</label><input type="email" id="email" name="email" placeholder="ornek@email.com" required></div>
+                <div class="form-group"><label>Şifre</label><input type="password" id="sifre" name="sifre" placeholder="••••••••" required></div>
+                <div class="auth-meta">
+                    <label class="check-line">
+                        <input type="checkbox" id="beni_hatirla" name="beni_hatirla">
+                        <span>Beni hatırla</span>
+                    </label>
+                    <button type="button" class="text-btn" id="forgot-pass">Şifremi unuttum</button>
+                </div>
+                <button class="btn btn-primary" type="submit">Giriş Yap</button>
+            </form>
+            <div class="auth-footer">Hesabınız yok mu? <a href="register.html">Ücretsiz Kayıt Ol</a></div>
+        </div>
     </div>
     <script src="../assets/js/script.js"></script>
 </body>

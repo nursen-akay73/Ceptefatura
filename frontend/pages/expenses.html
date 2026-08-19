@@ -41,16 +41,22 @@
                     </select>
                 </div>
                 <div class="table-wrap">
-                    <table class="table">
+                    <table class="table table-cards">
                         <thead>
-                            <tr><th>TARİH</th><th>FİRMA</th><th>KATEGORİ</th><th>TUTAR</th><th>KAYNAK</th><th>DURUM</th></tr>
+                            <tr><th>TARİH</th><th>FİRMA</th><th>KATEGORİ</th><th class="money">TUTAR</th><th>KAYNAK</th><th>DURUM</th></tr>
                         </thead>
-                        <tbody>
-                            <tr><td>03.08.2026</td><td>ABC Ofis</td><td>Ofis</td><td>₺2.500</td><td>Manuel</td><td><span class="badge success">İşlendi</span></td></tr>
-                            <tr><td>02.08.2026</td><td>Hızlı Kargo</td><td>Ulaşım</td><td>₺850</td><td>OCR</td><td><span class="badge success">İşlendi</span></td></tr>
-                            <tr><td>01.08.2026</td><td>Teknik Servis</td><td>Hizmet</td><td>₺1.750</td><td>OCR</td><td><span class="badge warning">Kontrol Bekliyor</span></td></tr>
+                        <tbody id="expense-table-body">
+                            <tr><td>03.08.2026</td><td>ABC Ofis</td><td>Ofis</td><td class="money">₺2.500,00</td><td>Manuel</td><td><span class="badge success">İşlendi</span></td></tr>
+                            <tr><td>02.08.2026</td><td>Hızlı Kargo</td><td>Ulaşım</td><td class="money">₺850,00</td><td>OCR</td><td><span class="badge success">İşlendi</span></td></tr>
+                            <tr><td>01.08.2026</td><td>Teknik Servis</td><td>Hizmet</td><td class="money">₺1.750,00</td><td>OCR</td><td><span class="badge warning">Kontrol Bekliyor</span></td></tr>
                         </tbody>
                     </table>
+                </div>
+                <div class="empty-state" data-empty-for="#expense-table-body">
+                    <div class="empty-icon">▣</div>
+                    <p data-empty-none>Henüz gider kaydı yok. Fiş yükleyerek 2 dakikada ilk kaydınızı oluşturun.</p>
+                    <p data-empty-filter hidden>Aramanıza uygun gider bulunamadı.</p>
+                    <a class="btn btn-primary" href="expense-new.html">+ Yeni Gider</a>
                 </div>
             </div>
 

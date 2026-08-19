@@ -1,77 +1,82 @@
--- Ceptefatura şema taslağı (Nurşen onaylar, backend buna göre yazar)
--- Henüz migration aracı yok; ilk sürüm için referans SQL.
+-- Ceptefatura — Neon PostgreSQL
+-- Yüksel: users, accounts, invoices, invoice_items, invoice_templates
+-- Şeyma: expenses
 
-CREATE TABLE users (
-  id            SERIAL PRIMARY KEY,
-  ad_soyad      VARCHAR(120) NOT NULL,
-  isletme_adi   VARCHAR(160) NOT NULL,
-  email         VARCHAR(160) NOT NULL UNIQUE,
-  sifre_hash    VARCHAR(255) NOT NULL,
-  created_at    TIMESTAMP DEFAULT NOW()
+create table if not exists users (
+  id            uuid primary key default gen_random_uuid(),
+  ad_soyad      varchar(120) not null,
+  isletme_adi   varchar(160) not null,
+  email         varchar(160) not null unique,
+  sifre_hash    varchar(255),
+  created_at    timestamptz not null default now()
 );
 
--- Yüksel
-CREATE TABLE accounts (
-  id          SERIAL PRIMARY KEY,
-  user_id     INTEGER NOT NULL REFERENCES users(id),
-  cari_adi    VARCHAR(160) NOT NULL,
-  turu        VARCHAR(40),
-  vergi_no    VARCHAR(20),
-  telefon     VARCHAR(30),
-  email       VARCHAR(160),
-  bakiye      NUMERIC(12, 2) DEFAULT 0,
-  created_at  TIMESTAMP DEFAULT NOW()
+create table if not exists accounts (
+  id          uuid primary key default gen_random_uuid(),
+  user_id     uuid not null references users(id) on delete cascade,
+  cari_adi    varchar(160) not null,
+  turu        varchar(40),
+  vergi_no    varchar(20),
+  telefon     varchar(30),
+  email       varchar(160),
+  bakiye      numeric(12, 2) not null default 0,
+  created_at  timestamptz not null default now()
 );
 
--- Yüksel
-CREATE TABLE invoices (
-  id              SERIAL PRIMARY KEY,
-  user_id         INTEGER NOT NULL REFERENCES users(id),
-  account_id      INTEGER NOT NULL REFERENCES accounts(id),
-  fatura_no       VARCHAR(40) NOT NULL,
-  fatura_turu     VARCHAR(20) NOT NULL, -- E-Fatura | E-Arşiv
-  kesim_tarihi    DATE NOT NULL,
-  vade_tarihi     DATE,
-  fatura_notu     TEXT,
-  tutar           NUMERIC(12, 2) NOT NULL DEFAULT 0,
-  durum           VARCHAR(20) NOT NULL DEFAULT 'Bekliyor', -- Ödendi | Bekliyor | Gecikti
-  created_at      TIMESTAMP DEFAULT NOW()
+create table if not exists invoices (
+  id              uuid primary key default gen_random_uuid(),
+  user_id         uuid not null references users(id) on delete cascade,
+  account_id      uuid not null references accounts(id),
+  fatura_no       varchar(40) not null,
+  fatura_turu     varchar(20) not null check (fatura_turu in ('E-Fatura', 'E-Arşiv')),
+  kesim_tarihi    date not null,
+  vade_tarihi     date,
+  fatura_notu     text,
+  tutar           numeric(12, 2) not null default 0,
+  durum           varchar(20) not null default 'Bekliyor'
+                  check (durum in ('Ödendi', 'Bekliyor', 'Gecikti')),
+  created_at      timestamptz not null default now(),
+  unique (user_id, fatura_no)
 );
 
-CREATE TABLE invoice_items (
-  id            SERIAL PRIMARY KEY,
-  invoice_id    INTEGER NOT NULL REFERENCES invoices(id) ON DELETE CASCADE,
-  aciklama      VARCHAR(255) NOT NULL,
-  miktar        NUMERIC(12, 2) NOT NULL DEFAULT 1,
-  birim_fiyat   NUMERIC(12, 2) NOT NULL DEFAULT 0,
-  kdv_orani     NUMERIC(5, 2) NOT NULL DEFAULT 20,
-  tutar         NUMERIC(12, 2) NOT NULL DEFAULT 0
+create table if not exists invoice_items (
+  id            uuid primary key default gen_random_uuid(),
+  invoice_id    uuid not null references invoices(id) on delete cascade,
+  aciklama      varchar(255) not null,
+  miktar        numeric(12, 2) not null default 1,
+  birim_fiyat   numeric(12, 2) not null default 0,
+  kdv_orani     numeric(5, 2) not null default 20,
+  tutar         numeric(12, 2) not null default 0
 );
 
-CREATE TABLE invoice_templates (
-  id                    SERIAL PRIMARY KEY,
-  user_id               INTEGER NOT NULL REFERENCES users(id),
-  account_id            INTEGER NOT NULL REFERENCES accounts(id),
-  fatura_sikligi        VARCHAR(20) NOT NULL,
-  baslangic_tarihi      DATE,
-  sonraki_fatura_tarihi DATE,
-  aciklama              VARCHAR(255),
-  miktar                NUMERIC(12, 2) DEFAULT 1,
-  birim_fiyat           NUMERIC(12, 2) DEFAULT 0,
-  kdv_orani             NUMERIC(5, 2) DEFAULT 20
+create table if not exists invoice_templates (
+  id                    uuid primary key default gen_random_uuid(),
+  user_id               uuid not null references users(id) on delete cascade,
+  account_id            uuid not null references accounts(id),
+  fatura_sikligi        varchar(20) not null
+                        check (fatura_sikligi in ('Haftalık', 'Aylık', '3 Aylık', 'Yıllık')),
+  baslangic_tarihi      date,
+  sonraki_fatura_tarihi date,
+  aciklama              varchar(255),
+  miktar                numeric(12, 2) default 1,
+  birim_fiyat           numeric(12, 2) default 0,
+  kdv_orani             numeric(5, 2) default 20,
+  created_at            timestamptz not null default now()
 );
 
--- Şeyma
-CREATE TABLE expenses (
-  id          SERIAL PRIMARY KEY,
-  user_id     INTEGER NOT NULL REFERENCES users(id),
-  tarih       DATE NOT NULL,
-  firma       VARCHAR(160),
-  kategori    VARCHAR(40) NOT NULL,
-  tutar       NUMERIC(12, 2) NOT NULL,
-  kaynak      VARCHAR(40) NOT NULL DEFAULT 'Manuel', -- Manuel | OCR | Banka Entegrasyonu
-  aciklama    TEXT,
-  durum       VARCHAR(40) NOT NULL DEFAULT 'İşlendi', -- İşlendi | Kontrol Bekliyor
-  belge_yolu  VARCHAR(255),
-  created_at  TIMESTAMP DEFAULT NOW()
+create table if not exists expenses (
+  id          uuid primary key default gen_random_uuid(),
+  user_id     uuid not null references users(id) on delete cascade,
+  tarih       date not null,
+  firma       varchar(160),
+  kategori    varchar(40) not null
+              check (kategori in ('Ofis', 'Ulaşım', 'Hizmet', 'Yemek / Temsil', 'Diğer')),
+  tutar       numeric(12, 2) not null,
+  kaynak      varchar(40) not null default 'Manuel'
+              check (kaynak in ('Manuel', 'OCR', 'Banka Entegrasyonu')),
+  aciklama    text,
+  durum       varchar(40) not null default 'İşlendi'
+              check (durum in ('İşlendi', 'Kontrol Bekliyor')),
+  belge_yolu  text,
+  created_at  timestamptz not null default now()
 );

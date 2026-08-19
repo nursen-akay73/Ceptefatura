@@ -24,7 +24,7 @@
                 </div>
             </div>
 
-            <form class="card form-card" data-demo-form data-redirect="invoices.html">
+            <form class="card form-card" data-demo-form data-redirect="invoices.html" data-toast="Fatura kaydedildi">
                 <div class="form-grid">
                     <div class="form-group">
                         <label>Fatura No</label>
@@ -56,14 +56,25 @@
                     </div>
                     <div class="form-group">
                         <label>Fatura Notu</label>
-                        <input type="text" placeholder="İsteğe bağlı not">
+                        <div class="input-mic">
+                            <input type="text" id="fatura_notu" placeholder="Konuşun, faturaya yazılsın...">
+                            <button type="button" class="mic-btn" data-mic-for="fatura_notu" title="Sesle yaz">🎤</button>
+                        </div>
                     </div>
                 </div>
+
+                <label class="repeat-toggle">
+                    <span>Bu faturayı her ay otomatik tekrarla</span>
+                    <span style="display:flex;align-items:center;gap:10px;">
+                        <input type="checkbox" id="repeat-invoice">
+                        <span class="switch"></span>
+                    </span>
+                </label>
 
                 <br>
                 <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:12px;">
                     <h3 style="font-size:15px; margin:0;">Fatura Kalemleri</h3>
-                    <button type="button" class="btn btn-secondary" id="btn-add-row" style="padding:6px 12px; font-size:12px;">＋ Kalem Ekle</button>
+                    <button type="button" class="btn btn-secondary" id="btn-add-row">＋ Kalem Ekle</button>
                 </div>
 
                 <div class="table-wrap">
@@ -74,13 +85,18 @@
                                 <th>MİKTAR</th>
                                 <th>BİRİM FİYAT (₺)</th>
                                 <th>KDV %</th>
-                                <th>TUTAR</th>
+                                <th class="money">TUTAR</th>
                                 <th></th>
                             </tr>
                         </thead>
                         <tbody id="items-body">
                             <tr>
-                                <td><input class="table-input item-desc" placeholder="Ürün veya hizmet adı" value="Danışmanlık Hizmet Bedeli"></td>
+                                <td>
+                                    <div class="input-mic">
+                                        <input class="table-input item-desc" placeholder="Konuşun, faturaya yazılsın..." value="Danışmanlık Hizmet Bedeli">
+                                        <button type="button" class="mic-btn" title="Sesle yaz">🎤</button>
+                                    </div>
+                                </td>
                                 <td><input class="table-input item-qty" type="number" value="1" min="1"></td>
                                 <td><input class="table-input item-price" type="number" value="8750"></td>
                                 <td>
@@ -91,11 +107,17 @@
                                         <option value="0">%0</option>
                                     </select>
                                 </td>
-                                <td class="item-total" style="font-weight:600;">₺8.750,00</td>
+                                <td class="item-total money" style="font-weight:600;">₺8.750,00</td>
                                 <td><button type="button" class="text-btn btn-delete-row" style="color:var(--danger);">Sil</button></td>
                             </tr>
                         </tbody>
                     </table>
+                </div>
+
+                <div class="totals-card" id="invoice-totals">
+                    <div><span>Ara toplam</span><span id="sum-sub">₺8.750,00</span></div>
+                    <div><span>KDV</span><span id="sum-vat">₺1.750,00</span></div>
+                    <div class="grand"><span>Genel toplam</span><span id="sum-grand">₺10.500,00</span></div>
                 </div>
 
                 <div class="form-actions" style="margin-top:24px; display:flex; justify-content:flex-end; gap:10px;">
@@ -127,15 +149,30 @@
             const itemsBody = document.getElementById('items-body');
             const btnAddRow = document.getElementById('btn-add-row');
 
+            function money(n) {
+                return '₺' + n.toLocaleString('tr-TR', { minimumFractionDigits: 2 });
+            }
+
             function calculateTotals() {
-                const rows = itemsBody.querySelectorAll('tr');
-                rows.forEach(row => {
+                let sub = 0, vat = 0;
+                itemsBody.querySelectorAll('tr').forEach(row => {
                     const qty = parseFloat(row.querySelector('.item-qty').value) || 0;
                     const price = parseFloat(row.querySelector('.item-price').value) || 0;
+                    const rate = parseFloat(row.querySelector('.item-vat')?.value) || 0;
                     const rowSub = qty * price;
-                    row.querySelector('.item-total').innerText = '₺' + rowSub.toLocaleString('tr-TR', { minimumFractionDigits: 2 });
+                    const rowVat = rowSub * rate / 100;
+                    sub += rowSub;
+                    vat += rowVat;
+                    row.querySelector('.item-total').innerText = money(rowSub + rowVat);
                 });
+                const subEl = document.getElementById('sum-sub');
+                const vatEl = document.getElementById('sum-vat');
+                const grandEl = document.getElementById('sum-grand');
+                if (subEl) subEl.textContent = money(sub);
+                if (vatEl) vatEl.textContent = money(vat);
+                if (grandEl) grandEl.textContent = money(sub + vat);
             }
+            calculateTotals();
 
             itemsBody.addEventListener('input', calculateTotals);
             itemsBody.addEventListener('change', calculateTotals);
@@ -144,7 +181,12 @@
                 btnAddRow.addEventListener('click', function () {
                     const tr = document.createElement('tr');
                     tr.innerHTML = `
-              <td><input class="table-input item-desc" placeholder="Ürün veya hizmet adı"></td>
+              <td>
+                <div class="input-mic">
+                  <input class="table-input item-desc" placeholder="Konuşun, faturaya yazılsın...">
+                  <button type="button" class="mic-btn" title="Sesle yaz">🎤</button>
+                </div>
+              </td>
               <td><input class="table-input item-qty" type="number" value="1" min="1"></td>
               <td><input class="table-input item-price" type="number" value="0"></td>
               <td>
@@ -155,20 +197,31 @@
                   <option value="0">%0</option>
                 </select>
               </td>
-              <td class="item-total" style="font-weight:600;">₺0,00</td>
+              <td class="item-total money" style="font-weight:600;">₺0,00</td>
               <td><button type="button" class="text-btn btn-delete-row" style="color:var(--danger);">Sil</button></td>
             `;
                     itemsBody.appendChild(tr);
+                    calculateTotals();
                 });
             }
 
+            document.getElementById("repeat-invoice")?.addEventListener("change", function () {
+                if (this.checked) showToast("Bu fatura her ay otomatik tekrarlanacak");
+            });
+
             itemsBody.addEventListener('click', function (e) {
+                const micBtn = e.target.closest('.mic-btn');
+                if (micBtn) {
+                    const input = micBtn.closest('td')?.querySelector('.item-desc');
+                    if (input) startSpeechToText(input, micBtn);
+                    return;
+                }
                 if (e.target.classList.contains('btn-delete-row')) {
                     if (itemsBody.querySelectorAll('tr').length > 1) {
                         e.target.closest('tr').remove();
                         calculateTotals();
                     } else {
-                        alert('En az bir fatura kalemi bulunmalıdır.');
+                        showToast("En az bir fatura kalemi bulunmalıdır.", "error");
                     }
                 }
             });

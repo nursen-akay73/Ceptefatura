@@ -23,14 +23,25 @@
                 </div>
             </div>
 
+            <div class="hint-banner">
+                <span>Kira, aidat veya düzenli danışmanlık faturalarınız her ay belirlediğiniz günde otomatik oluşturulur.</span>
+                <span class="badge info" id="next-run-badge">Sonraki: —</span>
+            </div>
+
             <form class="card form-card" data-demo-form data-redirect="invoices.html">
 
                 <div class="form-grid">
                     <div class="form-group"><label>Müşteri / Cari</label><select id="customer_id" name="customer_id"><option>ABC Teknoloji</option><option>XYZ Danışmanlık</option></select></div>
                     <div class="form-group"><label>Fatura Sıklığı</label><select id="fatura_sikligi" name="fatura_sikligi"><option>Aylık</option><option>Haftalık</option><option>3 Aylık</option><option>Yıllık</option></select></div>
-                    <div class="form-group"><label>Başlangıç Tarihi</label><input type="date" id="baslangic_tarihi" name="baslangic_tarihi"></div>
-                    <div class="form-group"><label>Sonraki Fatura Tarihi</label><input type="date" id="sonraki_fatura_tarihi" name="sonraki_fatura_tarihi"></div>
-                    <div class="form-group full"><label>Fatura Açıklaması</label><input id="aciklama" name="aciklama" placeholder="Örn: Aylık Danışmanlık Hizmet Bedeli"></div>
+                    <div class="form-group"><label>Başlangıç Tarihi</label><input type="date" id="baslangic_tarihi" name="baslangic_tarihi" value="2026-09-01"></div>
+                    <div class="form-group"><label>Sonraki Fatura Tarihi</label><input type="date" id="sonraki_fatura_tarihi" name="sonraki_fatura_tarihi" value="2026-09-01"></div>
+                    <div class="form-group full">
+                        <label>Fatura Açıklaması</label>
+                        <div class="input-mic">
+                            <input id="aciklama" name="aciklama" placeholder="Konuşun, faturaya yazılsın...">
+                            <button type="button" class="mic-btn" id="aciklama-mic-btn" title="Sesle yaz">🎤</button>
+                        </div>
+                    </div>
                     <div class="form-group"><label>Miktar</label><input type="number" id="miktar" name="miktar" value="1"></div>
                     <div class="form-group"><label>Birim Fiyat (₺)</label><input type="number" id="birim_fiyat" name="birim_fiyat" value="0"></div>
                     <div class="form-group"><label>KDV Oranı (%)</label><input type="number" id="kdv_orani" name="kdv_orani" value="20"></div>
@@ -45,5 +56,19 @@
         </main>
     </div>
     <script src="../assets/js/script.js"></script>
+    <script>
+        document.addEventListener("DOMContentLoaded", function () {
+            const start = document.getElementById("baslangic_tarihi");
+            const next = document.getElementById("sonraki_fatura_tarihi");
+            const badge = document.getElementById("next-run-badge");
+            const syncBadge = () => {
+                const value = next?.value || start?.value;
+                badge.textContent = value ? "Sonraki: " + value : "Sonraki: —";
+            };
+            start?.addEventListener("input", syncBadge);
+            next?.addEventListener("input", syncBadge);
+            syncBadge();
+        });
+    </script>
 </body>
 </html>

@@ -3,8 +3,9 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Ayarlar & Paketler | Akıllı Muhasebe</title>
+    <title>Ayarlar & Paketler | CepteFatura</title>
     <link rel="stylesheet" href="../assets/css/style.css">
+    <link rel="icon" href="../assets/img/logo-icon.png">
 </head>
 <body data-page="settings">
     <div id="sidebar-container"></div>
@@ -18,61 +19,87 @@
                 </div>
             </div>
 
-            <div class="tabs">
-                <a class="tab active" href="#">Abonelik & Paketler</a>
-                <a class="tab" href="#">Firma Profil Bilgileri</a>
-                <a class="tab" href="#">GİB E-Fatura Entegrasyonu</a>
-            </div>
-
-            <div class="grid three-col" style="margin-bottom:30px;">
-                <div class="card" style="border: 1px solid var(--border);">
-                    <h3>Ücretsiz Katman</h3>
-                    <p class="muted">Giriş seviyesi esnaflar için.</p>
-                    <div style="font-size:24px; font-weight:800; margin:15px 0;">₺0 <small style="font-size:12px; font-weight:normal;">/ay</small></div>
-                    <ul style="padding-left:18px; line-height:1.8; color:var(--muted); font-size:13px;">
-                        <li>Aylık 10 Fatura Kesimi</li>
-                        <li>Temel Gider Takibi</li>
-                        <li>Manuel Veri Girişi</li>
-                    </ul>
-                    <button class="btn btn-secondary" style="width:100%; justify-content:center; margin-top:15px;" disabled>Mevcut Plan</button>
+            <div data-tabs>
+                <div class="tabs">
+                    <button type="button" class="tab active" data-tab="plan">Abonelik & Paketler</button>
+                    <button type="button" class="tab" data-tab="profile">Firma Profil Bilgileri</button>
+                    <button type="button" class="tab" data-tab="gib">GİB E-Fatura Entegrasyonu</button>
                 </div>
 
-                <div class="card" style="border: 2px solid var(--primary); position:relative;">
-                    <span class="badge info" style="position:absolute; right:15px; top:15px;">Önerilen</span>
-                    <h3>KOBİ Paketi</h3>
-                    <p class="muted">Abonelikli & aktif KOBİ'ler için.</p>
-                    <div style="font-size:24px; font-weight:800; margin:15px 0; color:var(--primary)">₺299 <small style="font-size:12px; font-weight:normal; color:var(--text)">/ay</small></div>
-                    <ul style="padding-left:18px; line-height:1.8; color:var(--text); font-size:13px;">
-                        <li>Sınırsız Fatura Kesimi</li>
-                        <li>Otomatik Tekrarlayan Faturalar</li>
-                        <li>OCR Fiş Okuma & AI Kategori</li>
-                        <li>GİB E-Fatura / E-Arşiv Bağlantısı</li>
-                    </ul>
-                    <button class="btn btn-primary" style="width:100%; justify-content:center; margin-top:15px;">Paketi Yükselt</button>
+                <div data-tab-panel="plan">
+                    <div class="grid three-col">
+                        <div class="card">
+                            <h3>Ücretsiz Katman</h3>
+                            <p class="muted">Giriş seviyesi esnaflar için.</p>
+                            <div class="value" style="font-size:24px; font-weight:700; margin:16px 0;">₺0 <small class="muted" style="font-size:12px; font-weight:500;">/ay</small></div>
+                            <ul style="padding-left:18px; line-height:1.8; color:var(--muted); font-size:13px;">
+                                <li>Aylık 10 Fatura Kesimi</li>
+                                <li>Temel Gider Takibi</li>
+                                <li>Manuel Veri Girişi</li>
+                            </ul>
+                            <button class="btn btn-secondary" type="button" style="width:100%; justify-content:center; margin-top:16px;" disabled>Mevcut Plan</button>
+                        </div>
+
+                        <div class="card" style="border: 2px solid var(--primary); position:relative;">
+                            <span class="badge info" style="position:absolute; right:16px; top:16px;">Önerilen</span>
+                            <h3>KOBİ Paketi</h3>
+                            <p class="muted">Abonelikli & aktif KOBİ'ler için.</p>
+                            <div style="font-size:24px; font-weight:700; margin:16px 0; color:var(--primary)">₺299 <small class="muted" style="font-size:12px; font-weight:500;">/ay</small></div>
+                            <ul style="padding-left:18px; line-height:1.8; color:#475569; font-size:13px;">
+                                <li>Sınırsız Fatura Kesimi</li>
+                                <li>Otomatik Tekrarlayan Faturalar</li>
+                                <li>OCR Fiş Okuma & AI Kategori</li>
+                                <li>GİB E-Fatura / E-Arşiv Bağlantısı</li>
+                            </ul>
+                            <button class="btn btn-primary" type="button" id="btn-upgrade-plan" style="width:100%; justify-content:center; margin-top:16px;">Paketi Yükselt</button>
+                        </div>
+
+                        <div class="card">
+                            <h3>Muhasebeci Paketi</h3>
+                            <p class="muted">Mali müşavir ve ajanslar için.</p>
+                            <div style="font-size:24px; font-weight:700; margin:16px 0;">₺799 <small class="muted" style="font-size:12px; font-weight:500;">/ay</small></div>
+                            <ul style="padding-left:18px; line-height:1.8; color:var(--muted); font-size:13px;">
+                                <li>Çoklu Müşteri Yönetimi</li>
+                                <li>Muhasebeci Özel Paneli</li>
+                                <li>Toplu Belge Onaylama</li>
+                                <li>Öncelikli Destek</li>
+                            </ul>
+                            <button class="btn btn-secondary" type="button" id="btn-contact-plan" style="width:100%; justify-content:center; margin-top:16px;">İletişime Geç</button>
+                        </div>
+                    </div>
                 </div>
 
-                <div class="card" style="border: 1px solid var(--border);">
-                    <h3>Muhasebeci Paketi</h3>
-                    <p class="muted">Mali müşavir ve ajanslar için.</p>
-                    <div style="font-size:24px; font-weight:800; margin:15px 0;">₺799 <small style="font-size:12px; font-weight:normal;">/ay</small></div>
-                    <ul style="padding-left:18px; line-height:1.8; color:var(--muted); font-size:13px;">
-                        <li>Çoklu Müşteri Yönetimi</li>
-                        <li>Muhasebeci Özel Paneli</li>
-                        <li>Toplu Belge Onaylama</li>
-                        <li>Öncelikli Destek</li>
-                    </ul>
-                    <button class="btn btn-secondary" style="width:100%; justify-content:center; margin-top:15px;">İletişime Geç</button>
+                <div data-tab-panel="profile" hidden>
+                    <form class="card form-card" data-demo-form>
+                        <div class="card-header"><h2>Firma Profil Bilgileri</h2></div>
+                        <div class="form-grid">
+                            <div class="form-group"><label>İşletme Unvanı</label><input type="text" value="CepteFatura Demo" required></div>
+                            <div class="form-group"><label>Vergi / TC No</label><input type="text" value="1234567890"></div>
+                            <div class="form-group"><label>Vergi Dairesi</label><input type="text" value="Maslak"></div>
+                            <div class="form-group"><label>Telefon</label><input type="tel" value="0555 111 22 33"></div>
+                            <div class="form-group"><label>E-posta</label><input type="email" value="info@ceptefatura.com"></div>
+                            <div class="form-group"><label>Şehir</label><input type="text" value="İstanbul"></div>
+                            <div class="form-group full"><label>Adres</label><input type="text" value="Maslak Mah. No:12"></div>
+                        </div>
+                        <div class="form-actions">
+                            <button class="btn btn-primary" type="submit">Profili Kaydet</button>
+                        </div>
+                    </form>
                 </div>
-            </div>
 
-            <div class="card form-card">
-                <div class="card-header"><h2>GİB E-Fatura Entegratör Ayarları</h2></div>
-                <div class="form-grid">
-                    <div class="form-group"><label>Entegratör Firma</label><select><option>İzibiz</option><option>Foriba / Sovos</option><option>Trendyol / Uyumsoft</option></select></div>
-                    <div class="form-group"><label>API Kullanıcı Adı</label><input type="text" placeholder="GİB Kullanıcı Adı"></div>
-                    <div class="form-group full"><label>API Anahtarı (Secret Key)</label><input type="password" placeholder="••••••••••••••••"></div>
+                <div data-tab-panel="gib" hidden>
+                    <form class="card form-card" data-demo-form>
+                        <div class="card-header"><h2>GİB E-Fatura Entegratör Ayarları</h2></div>
+                        <div class="form-grid">
+                            <div class="form-group"><label>Entegratör Firma</label><select><option>İzibiz</option><option>Foriba / Sovos</option><option>Trendyol / Uyumsoft</option></select></div>
+                            <div class="form-group"><label>API Kullanıcı Adı</label><input type="text" placeholder="GİB Kullanıcı Adı"></div>
+                            <div class="form-group full"><label>API Anahtarı (Secret Key)</label><input type="password" placeholder="••••••••••••••••"></div>
+                        </div>
+                        <div class="form-actions">
+                            <button class="btn btn-primary" type="submit">Entegrasyonu Kaydet</button>
+                        </div>
+                    </form>
                 </div>
-                <div class="form-actions"><button class="btn btn-primary">Entegrasyonu Kaydet</button></div>
             </div>
 
         </main>

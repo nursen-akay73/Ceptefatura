@@ -112,7 +112,7 @@
 
             <div class="grid stats">
                 <div class="card stat-card"><span class="label">Bağlı İşletme</span><div class="value" id="stat-company-count">12</div></div>
-                <div class="card stat-card"><span class="label">Bekleyen Belge</span><div class="value">18</div></div>
+                <div class="card stat-card"><span class="label">Onay Bekleyen Fişler</span><div class="value">18</div></div>
                 <div class="card stat-card"><span class="label">Bu Ay Tamamlanan</span><div class="value">146</div></div>
                 <div class="card stat-card"><span class="label">Yaklaşan Beyanname</span><div class="value">4</div></div>
             </div>
@@ -124,7 +124,7 @@
                     <input class="table-input" id="search-company" placeholder="İşletme veya vergi no ara...">
                 </div>
                 <div class="table-wrap">
-                    <table class="table">
+                    <table class="table table-cards">
                         <thead>
                             <tr>
                                 <th>İŞLETME</th>
@@ -154,6 +154,7 @@
                                             data-muhtasar="Onay Bekliyor">
                                         Detay
                                     </button>
+                                    <a class="btn btn-secondary btn-sm js-switch-company" href="dashboard.html">İşletmeye Geçiş Yap →</a>
                                 </td>
                             </tr>
                             <tr>
@@ -174,6 +175,7 @@
                                             data-muhtasar="Hazırlandı ✓">
                                         Detay
                                     </button>
+                                    <a class="btn btn-secondary btn-sm js-switch-company" href="dashboard.html">İşletmeye Geçiş Yap →</a>
                                 </td>
                             </tr>
                             <tr>
@@ -194,6 +196,7 @@
   data-muhtasar="Hazırlanmadı">
                              Detay
                                     </button>
+                                    <a class="btn btn-secondary btn-sm js-switch-company" href="dashboard.html">İşletmeye Geçiş Yap →</a>
                                 </td>
                             </tr>
                         </tbody>
@@ -249,7 +252,7 @@
         </div>
     </div>
 
-    <div class="modal-overlay" id="companyModal">
+    <div class="modal-overlay drawer" id="companyModal">
         <div class="modal-card">
             <div class="modal-header">
                 <div>
@@ -284,6 +287,7 @@
             </div>
             <div style="display:flex; justify-content:flex-end; gap:10px; margin-top:20px; border-top:1px solid #f1f5f9; padding-top:12px;">
                 <button class="btn btn-secondary" id="closeModalBtn">Kapat</button>
+                <a class="btn btn-primary js-switch-company" href="dashboard.html">İşletmeye Geçiş Yap →</a>
             </div>
         </div>
     </div>
@@ -365,6 +369,7 @@
                       data-muhtasar="Hazırlanıyor">
                 Detay
               </button>
+              <a class="btn btn-secondary btn-sm js-switch-company" href="dashboard.html">İşletmeye Geçiş Yap →</a>
             </td>
           `;
 
@@ -375,7 +380,7 @@
 
                 attachDetailEvents();
 
-                alert(`"${name}" işletmesi başarıyla sisteme bağlandı.`);
+                showToast('"' + name + '" işletmesi bağlandı');
                 hideAddModal();
                 formAddCompany.reset();
             });

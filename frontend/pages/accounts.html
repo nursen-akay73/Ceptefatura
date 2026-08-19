@@ -129,16 +129,17 @@
                 </div>
 
                 <div class="table-wrap">
-                    <table class="table">
+                    <table class="table table-cards">
                         <thead>
                             <tr>
-                                <th>CARİ ADI</th>
-                                <th>TÜRÜ</th>
-                                <th>VERGİ NO</th>
-                                <th>TELEFON</th>
-                                <th>E-POSTA</th>
-                                <th>BAKİYE</th>
-                                <th>İŞLEM</th>
+                                <th>Cari Adı</th>
+                                <th>Türü</th>
+                                <th>Vergi No</th>
+                                <th>Telefon</th>
+                                <th>E-posta</th>
+                                <th class="money">Bakiye</th>
+                                <th>Durum</th>
+                                <th>İşlem</th>
                             </tr>
                         </thead>
                         <tbody id="accounts-table-body">
@@ -148,7 +149,8 @@
                                 <td>1234567890</td>
                                 <td>0555 111 22 33</td>
                                 <td>info@abcteknoloji.com</td>
-                                <td style="color:var(--success); font-weight:600;">₺25.000 Alacak</td>
+                                <td class="money">₺25.000,00</td>
+                                <td><span class="badge credit">Alacak</span></td>
                                 <td>
                                     <button class="text-btn btn-account-detail"
                                             data-name="ABC Teknoloji"
@@ -156,7 +158,8 @@
                                             data-vno="1234567890"
                                             data-phone="0555 111 22 33"
                                             data-email="info@abcteknoloji.com"
-                                            data-balance="₺25.000 Alacak"
+                                            data-balance="₺25.000,00"
+                                            data-status="Alacak"
                                             data-address="İstanbul, Maslak Mah. No:12">
                                         Detay
                                     </button>
@@ -168,7 +171,8 @@
                                 <td>9876543210</td>
                                 <td>0555 444 55 66</td>
                                 <td>info@xyz.com</td>
-                                <td style="color:var(--success); font-weight:600;">₺8.750 Alacak</td>
+                                <td class="money">₺8.750,00</td>
+                                <td><span class="badge credit">Alacak</span></td>
                                 <td>
                                     <button class="text-btn btn-account-detail"
                                             data-name="XYZ Danışmanlık"
@@ -176,7 +180,8 @@
                                             data-vno="9876543210"
                                             data-phone="0555 444 55 66"
                                             data-email="info@xyz.com"
-                                            data-balance="₺8.750 Alacak"
+                                            data-balance="₺8.750,00"
+                                            data-status="Alacak"
                                             data-address="Ankara, Çankaya No:45">
                                         Detay
                                     </button>
@@ -188,7 +193,8 @@
                                 <td>4567890123</td>
                                 <td>0555 777 88 99</td>
                                 <td>info@beta.com</td>
-                                <td style="color:var(--danger); font-weight:600;">₺5.400 Borç</td>
+                                <td class="money">₺5.400,00</td>
+                                <td><span class="badge debit">Borç</span></td>
                                 <td>
                                     <button class="text-btn btn-account-detail"
                                             data-name="Beta Lojistik"
@@ -196,7 +202,8 @@
                                             data-vno="4567890123"
                                             data-phone="0555 777 88 99"
                                             data-email="info@beta.com"
-                                            data-balance="₺5.400 Borç"
+                                            data-balance="₺5.400,00"
+                                            data-status="Borç"
                                             data-address="İzmir, Bornova No:88">
                                         Detay
                                     </button>
@@ -208,7 +215,8 @@
                                 <td>3322114455</td>
                                 <td>0532 999 11 22</td>
                                 <td>destek@gammayazilim.com</td>
-                                <td style="color:var(--muted); font-weight:600;">₺0,00</td>
+                                <td class="money">₺0,00</td>
+                                <td><span class="badge balanced">Dengede</span></td>
                                 <td>
                                     <button class="text-btn btn-account-detail"
                                             data-name="Gamma Yazılım & Donanım"
@@ -217,6 +225,7 @@
                                             data-phone="0532 999 11 22"
                                             data-email="destek@gammayazilim.com"
                                             data-balance="₺0,00"
+                                            data-status="Dengede"
                                             data-address="Kocaeli, Gebze Teknopark">
                                         Detay
                                     </button>
@@ -225,12 +234,18 @@
                         </tbody>
                     </table>
                 </div>
+                <div class="empty-state" data-empty-for="#accounts-table-body">
+                    <div class="empty-icon">♙</div>
+                    <p data-empty-none>Henüz cari hesap eklemediniz. İlk müşteri veya tedarikçinizi kaydedin.</p>
+                    <p data-empty-filter hidden>Aramanıza uygun cari bulunamadı.</p>
+                    <button class="btn btn-primary" type="button" id="btn-empty-new-account">+ Yeni Cari</button>
+                </div>
             </div>
 
         </main>
     </div>
 
-    <div class="modal-overlay" id="accountDetailModal">
+    <div class="modal-overlay drawer" id="accountDetailModal">
         <div class="modal-card">
             <div class="modal-header">
                 <div>
@@ -242,7 +257,7 @@
             <div class="modal-body">
                 <div class="detail-grid">
                     <div><strong>Vergi Numarası:</strong> <br><span id="m-account-vno">1234567890</span></div>
-                    <div><strong>Güncel Bakiye:</strong> <br><span id="m-account-balance" style="font-weight:bold;">₺25.000 Alacak</span></div>
+                    <div><strong>Güncel Bakiye:</strong> <br><span id="m-account-balance" class="money" style="font-weight:600;">₺25.000,00</span> <span id="m-account-status" class="badge credit">Alacak</span></div>
                     <div><strong>Telefon:</strong> <br><span id="m-account-phone">0555 111 22 33</span></div>
                     <div><strong>E-Posta:</strong> <br><span id="m-account-email">info@abcteknoloji.com</span></div>
                     <div style="grid-column: span 2;"><strong>Adres:</strong> <br><span id="m-account-address">İstanbul, Maslak</span></div>
@@ -273,7 +288,7 @@
             </div>
             <div style="display:flex; justify-content:flex-end; gap:10px; margin-top:20px; border-top:1px solid #f1f5f9; padding-top:12px;">
                 <button class="btn btn-secondary" id="closeDetailBtn">Kapat</button>
-                <a class="btn btn-primary" href="invoice-new.html"> Bu Cariye Fatura Kes</a>
+                <a class="btn btn-primary" id="btn-invoice-for-account" href="invoice-new.html"> Bu Cariye Fatura Kes</a>
             </div>
         </div>
     </div>
@@ -373,7 +388,15 @@
                     document.getElementById('m-account-phone').innerText = this.getAttribute('data-phone');
                     document.getElementById('m-account-email').innerText = this.getAttribute('data-email');
                     document.getElementById('m-account-balance').innerText = this.getAttribute('data-balance');
+                    const status = this.getAttribute('data-status') || '';
+                    const statusEl = document.getElementById('m-account-status');
+                    if (statusEl) {
+                        statusEl.textContent = status;
+                        statusEl.className = 'badge ' + (status === 'Alacak' ? 'credit' : status === 'Borç' ? 'debit' : 'balanced');
+                    }
                     document.getElementById('m-account-address').innerText = this.getAttribute('data-address');
+                    const invoiceLink = document.getElementById('btn-invoice-for-account');
+                    if (invoiceLink) invoiceLink.href = 'invoice-new.html?cari=' + encodeURIComponent(this.getAttribute('data-name'));
 
                     detailModal.classList.add('active');
                 });
@@ -399,7 +422,7 @@
 
             formNewAccount.addEventListener('submit', function (e) {
                 e.preventDefault();
-                alert('Yeni cari hesap başarıyla kaydedildi!');
+                showToast('Yeni cari hesap kaydedildi');
                 hideNewModal();
                 formNewAccount.reset();
             });

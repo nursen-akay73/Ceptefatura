@@ -1,52 +1,53 @@
 # Ceptefatura
 
-Türkiye pazarı için KOBİ/esnaf odaklı, otomasyon ve yapay zekâ destekli
-akıllı muhasebe ve e-fatura web platformu (MVP).
+KOBİ/esnaf için muhasebe ve e-fatura MVP.
 
-## Görev Dağılımı
+Backend: **Node.js / Express** (Python yok).  
+Veritabanı: Neon PostgreSQL.
 
-👉 [PROJE_GOREV_DAGILIMI.md](./PROJE_GOREV_DAGILIMI.md)
+## Kim ne yapar
 
-| Kişi | Branch | İş |
+| Kişi | Branch | Dosya |
 |---|---|---|
-| Zeynep | `feature/fatura-modulu` | Fatura + cari ekranlarını API’ye bağla |
-| Ester | `feature/gider-modulu` | Gider + login + dashboard’u API’ye bağla |
-| Yüksel | `feature/fatura-modulu` | Fatura, cari, auth API |
-| Şeyma | `feature/gider-modulu` | Gider API + belge yükleme |
-| Nurşen | `develop` | Veritabanı şeması ve testler |
+| Yüksel | `feature/fatura-modulu` | `backend/routes/auth.js`, `accounts.js`, `invoices.js` |
+| Şeyma | `feature/gider-modulu` | `backend/routes/expenses.js` |
+| Zeynep | `feature/fatura-modulu` | fatura + cari ekranları |
+| Ester | `feature/gider-modulu` | login, gider, dashboard |
+| Nurşen | `develop` | `database/schema.sql` |
 
-## Ekip
+`main`’e push yok. PR → `develop`.
 
-- Backend: Yüksel, Şeyma
-- Frontend/UI: Zeynep, Ester
-- Veritabanı & Test: Nurşen
-
-## Branch Kuralı
-
-- `main` → sadece PR ile, direkt push yasak
-- `develop` → aktif geliştirme
-- `feature/...` → kişisel / modül çalışma dalları
-
-## Klasör Yapısı
+## Klasörler
 
 ```
-/frontend    HTML/CSS UI (Zeynep prototipi)
-/backend     Express API iskeleti
-/database    şema
-/tests       test otomasyonu
+frontend/
+backend/
+  index.js
+  db.js                 Neon bağlantısı
+  middleware/auth.js    JWT
+  routes/auth.js        kayıt / giriş
+  routes/accounts.js    cariler
+  routes/invoices.js    faturalar
+  routes/expenses.js    giderler
+database/schema.sql
 ```
 
 ## Çalıştırma
 
-Frontend: `frontend/pages/login.html` dosyasını tarayıcıda aç.
-
-Backend:
+Proje kökünden:
 
 ```bash
 cd backend
 cp .env.example .env
-npm install
+```
+
+`.env` içine Neon `DATABASE_URL` ve bir `JWT_SECRET` yaz. İlk seferde `cd backend && npm install`.
+
+Sonra kök klasörde:
+
+```bash
 npm run dev
 ```
 
-API: http://localhost:3000/api/health
+API: http://localhost:3000/api/health  
+Site: http://localhost:3000

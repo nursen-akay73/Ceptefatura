@@ -25,20 +25,22 @@
             </div>
 
             <div class="grid stats">
-                <div class="card stat-card"><span class="label">Toplam Gider</span><div class="value">₺32.000</div></div>
-                <div class="card stat-card"><span class="label">Bu Ay Belge</span><div class="value">24</div></div>
-                <div class="card stat-card"><span class="label">İndirilecek KDV</span><div class="value">₺5.760</div></div>
-                <div class="card stat-card"><span class="label">Bekleyen Belge</span><div class="value">3</div></div>
+                <div class="card stat-card"><span class="label">Toplam Gider</span><div class="value" id="stat-toplam-gider">₺0,00</div></div>
+                <div class="card stat-card"><span class="label">Bu Ay Belge</span><div class="value" id="stat-bu-ay-belge">0</div></div>
+                <div class="card stat-card"><span class="label">İndirilecek KDV</span><div class="value" id="stat-indirilecek-kdv">₺0,00</div></div>
+                <div class="card stat-card"><span class="label">Bekleyen Belge</span><div class="value" id="stat-bekleyen-belge">0</div></div>
             </div><br>
 
             <div class="card">
                 <div class="filter-row">
-                    <input type="search" placeholder="Firma veya açıklama ara">
-                    <select>
-                        <option>Tüm Kategoriler</option>
+                    <input type="search" id="search-expenses" placeholder="Firma veya açıklama ara">
+                    <select id="filter-expense-category">
+                        <option value="">Tüm Kategoriler</option>
                         <option>Ofis</option>
                         <option>Ulaşım</option>
                         <option>Hizmet</option>
+                        <option>Yemek / Temsil</option>
+                        <option>Diğer</option>
                     </select>
                 </div>
                 <div class="table-wrap">
@@ -46,11 +48,7 @@
                         <thead>
                             <tr><th>TARİH</th><th>FİRMA</th><th>KATEGORİ</th><th class="money">TUTAR</th><th>KAYNAK</th><th>DURUM</th></tr>
                         </thead>
-                        <tbody id="expense-table-body">
-                            <tr><td>03.08.2026</td><td>ABC Ofis</td><td>Ofis</td><td class="money">₺2.500,00</td><td>Manuel</td><td><span class="badge success">İşlendi</span></td></tr>
-                            <tr><td>02.08.2026</td><td>Hızlı Kargo</td><td>Ulaşım</td><td class="money">₺850,00</td><td>OCR</td><td><span class="badge success">İşlendi</span></td></tr>
-                            <tr><td>01.08.2026</td><td>Teknik Servis</td><td>Hizmet</td><td class="money">₺1.750,00</td><td>OCR</td><td><span class="badge warning">Kontrol Bekliyor</span></td></tr>
-                        </tbody>
+                        <tbody id="expense-table-body"></tbody>
                     </table>
                 </div>
                 <div class="empty-state" data-empty-for="#expense-table-body">
@@ -64,5 +62,67 @@
         </main>
     </div>
     <script src="../assets/js/script.js"></script>
+    <script>
+        document.addEventListener('DOMContentLoaded', function () {
+            const searchInput = document.getElementById('search-expenses');
+            const categorySelect = document.getElementById('filter-expense-category');
+            const tableBody = document.getElementById('expense-table-body');
+            const money = (n) => '₺' + Number(n || 0).toLocaleString('tr-TR', { minimumFractionDigits: 2 });
+            const dateTr = (d) => d ? new Date(d).toLocaleDateString('tr-TR') : '—';
+
+            function renderRow(exp) {
+                const tr = document.createElement('tr');
+                tr.innerHTML = `
+            <td></td>
+            <td></td>
+            <td></td>
+            <td class="money"></td>
+            <td></td>
+            <td><span class="badge ${exp.durum === 'İşlendi' ? 'success' : 'warning'}"></span></td>
+          `;
+                tr.children[0].textContent = dateTr(exp.tarih);
+                tr.children[1].textContent = exp.firma || '—';
+                tr.children[2].textContent = exp.kategori;
+                tr.querySelector('.money').textContent = money(exp.tutar);
+                tr.children[4].textContent = exp.kaynak;
+                tr.querySelector('.badge').textContent = exp.durum;
+                return tr;
+            }
+
+            async function loadStats() {
+                try {
+                    const stats = await apiFetch('/api/expenses/stats');
+                    document.getElementById('stat-toplam-gider').textContent = money(stats.toplam_gider);
+                    document.getElementById('stat-bu-ay-belge').textContent = stats.bu_ay_belge;
+                    document.getElementById('stat-indirilecek-kdv').textContent = money(stats.indirilecek_kdv);
+                    document.getElementById('stat-bekleyen-belge').textContent = stats.bekleyen_belge;
+                } catch (err) {
+                    showToast(err.message || 'İstatistikler alınamadı', 'error');
+                }
+            }
+
+            async function loadExpenses() {
+                const params = new URLSearchParams();
+                if (searchInput.value.trim()) params.set('search', searchInput.value.trim());
+                if (categorySelect.value) params.set('kategori', categorySelect.value);
+
+                try {
+                    const list = await apiFetch('/api/expenses?' + params.toString());
+                    tableBody.innerHTML = '';
+                    list.forEach((exp) => tableBody.appendChild(renderRow(exp)));
+                    syncEmptyStates();
+                } catch (err) {
+                    showToast(err.message || 'Giderler alınamadı', 'error');
+                }
+            }
+
+            let debounce;
+            searchInput.addEventListener('input', () => { clearTimeout(debounce); debounce = setTimeout(loadExpenses, 300); });
+            categorySelect.addEventListener('change', loadExpenses);
+
+            loadStats();
+            loadExpenses();
+        });
+    </script>
 </body>
 </html>

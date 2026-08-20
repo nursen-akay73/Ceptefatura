@@ -29,10 +29,10 @@
                 <span class="badge info" id="next-run-badge">Sonraki: —</span>
             </div>
 
-            <form class="card form-card" data-demo-form data-redirect="invoices.html">
+            <form class="card form-card" id="form-invoice-template">
 
                 <div class="form-grid">
-                    <div class="form-group"><label>Müşteri / Cari</label><select id="customer_id" name="customer_id"><option>ABC Teknoloji</option><option>XYZ Danışmanlık</option></select></div>
+                    <div class="form-group"><label>Müşteri / Cari</label><select id="customer_id" name="customer_id"></select></div>
                     <div class="form-group"><label>Fatura Sıklığı</label><select id="fatura_sikligi" name="fatura_sikligi"><option>Aylık</option><option>Haftalık</option><option>3 Aylık</option><option>Yıllık</option></select></div>
                     <div class="form-group"><label>Başlangıç Tarihi</label><input type="date" id="baslangic_tarihi" name="baslangic_tarihi" value="2026-09-01"></div>
                     <div class="form-group"><label>Sonraki Fatura Tarihi</label><input type="date" id="sonraki_fatura_tarihi" name="sonraki_fatura_tarihi" value="2026-09-01"></div>
@@ -58,7 +58,7 @@
     </div>
     <script src="../assets/js/script.js"></script>
     <script>
-        document.addEventListener("DOMContentLoaded", function () {
+        document.addEventListener("DOMContentLoaded", async function () {
             const start = document.getElementById("baslangic_tarihi");
             const next = document.getElementById("sonraki_fatura_tarihi");
             const badge = document.getElementById("next-run-badge");
@@ -69,6 +69,50 @@
             start?.addEventListener("input", syncBadge);
             next?.addEventListener("input", syncBadge);
             syncBadge();
+
+            const customerSelect = document.getElementById("customer_id");
+            try {
+                const cariler = await apiFetch("/api/accounts");
+                customerSelect.innerHTML = cariler
+                    .map((c) => `<option value="${c.id}">${escapeHtml(c.cari_adi)}</option>`)
+                    .join("");
+                if (!cariler.length) {
+                    showToast("Önce Cari Hesaplar sayfasından bir cari ekleyin", "error");
+                }
+            } catch (err) {
+                showToast(err.message || "Cariler alınamadı", "error");
+            }
+
+            document.getElementById("form-invoice-template").addEventListener("submit", async function (e) {
+                e.preventDefault();
+                const account_id = customerSelect.value;
+                if (!account_id) {
+                    showToast("Önce bir cari seçin", "error");
+                    return;
+                }
+                const submitBtn = this.querySelector("button[type=submit]");
+                if (submitBtn) submitBtn.disabled = true;
+                try {
+                    await apiFetch("/api/invoices/templates", {
+                        method: "POST",
+                        body: {
+                            account_id,
+                            fatura_sikligi: document.getElementById("fatura_sikligi").value,
+                            baslangic_tarihi: start.value,
+                            sonraki_fatura_tarihi: next.value,
+                            aciklama: document.getElementById("aciklama").value.trim(),
+                            miktar: document.getElementById("miktar").value,
+                            birim_fiyat: document.getElementById("birim_fiyat").value,
+                            kdv_orani: document.getElementById("kdv_orani").value,
+                        },
+                    });
+                    showToast("Otomatik şablon kaydedildi");
+                    setTimeout(() => { window.location.href = "invoices.html"; }, 600);
+                } catch (err) {
+                    showToast(err.message || "Şablon kaydedilemedi", "error");
+                    if (submitBtn) submitBtn.disabled = false;
+                }
+            });
         });
     </script>
 </body>

@@ -3,7 +3,7 @@ const { Pool } = require("pg");
 const hasDatabaseUrl = Boolean(process.env.DATABASE_URL);
 
 if (!hasDatabaseUrl) {
-  console.warn("DATABASE_URL tanımsız — backend/.env içine Neon connection string yazılmalı.");
+  console.warn("DATABASE_URL tanımsız — Neon connection string'i backend/.env içine yaz");
 }
 
 const pool = new Pool({

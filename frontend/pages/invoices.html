@@ -127,6 +127,9 @@
                         <option value="E-Fatura">E-Fatura</option>
                         <option value="E-Arşiv">E-Arşiv</option>
                     </select>
+                    <select id="filter-branch" hidden>
+                        <option value="">Tüm Şubeler</option>
+                    </select>
                 </div>
 
                 <div class="table-wrap">
@@ -143,58 +146,7 @@
                                 <th>İŞLEM</th>
                             </tr>
                         </thead>
-                        <tbody id="invoice-table-body">
-                            <tr>
-                                <td>INV-2026-001</td>
-                                <td>ABC Teknoloji</td>
-                                <td>E-Fatura</td>
-                                <td>03.08.2026</td>
-                                <td>03.09.2026</td>
-                                <td class="money">₺12.500,00</td>
-                                <td><span class="badge success">Ödendi</span></td>
-                                <td><button class="text-btn btn-detail" data-no="INV-2026-001" data-cari="ABC Teknoloji" data-turu="E-Fatura" data-tarih="03.08.2026" data-tutar="₺12.500" data-durum="Ödendi">Detay</button></td>
-                            </tr>
-                            <tr>
-                                <td>INV-2026-002</td>
-                                <td>XYZ Danışmanlık</td>
-                                <td>E-Arşiv</td>
-                                <td>01.08.2026</td>
-                                <td>10.08.2026</td>
-                                <td class="money">₺8.750,00</td>
-                                <td><span class="badge warning">Bekliyor</span></td>
-                                <td><button class="text-btn btn-detail" data-no="INV-2026-002" data-cari="XYZ Danışmanlık" data-turu="E-Arşiv" data-tarih="01.08.2026" data-tutar="₺8.750" data-durum="Bekliyor">Detay</button></td>
-                            </tr>
-                            <tr>
-                                <td>INV-2026-003</td>
-                                <td>Beta Lojistik</td>
-                                <td>E-Fatura</td>
-                                <td>28.07.2026</td>
-                                <td>28.07.2026</td>
-                                <td class="money">₺5.400,00</td>
-                                <td><span class="badge danger">Gecikti</span></td>
-                                <td><button class="text-btn btn-detail" data-no="INV-2026-003" data-cari="Beta Lojistik" data-turu="E-Fatura" data-tarih="28.07.2026" data-tutar="₺5.400" data-durum="Gecikti">Detay</button></td>
-                            </tr>
-                            <tr>
-                                <td>INV-2026-004</td>
-                                <td>Delta Mimarlık</td>
-                                <td>E-Arşiv</td>
-                                <td>04.08.2026</td>
-                                <td>20.08.2026</td>
-                                <td class="money">₺14.200,00</td>
-                                <td><span class="badge warning">Bekliyor</span></td>
-                                <td><button class="text-btn btn-detail" data-no="INV-2026-004" data-cari="Delta Mimarlık" data-turu="E-Arşiv" data-tarih="04.08.2026" data-tutar="₺14.200" data-durum="Bekliyor">Detay</button></td>
-                            </tr>
-                            <tr>
-                                <td>INV-2026-005</td>
-                                <td>Zirve Enerji</td>
-                                <td>E-Fatura</td>
-                                <td>25.07.2026</td>
-                                <td>15.08.2026</td>
-                                <td class="money">₺22.000,00</td>
-                                <td><span class="badge success">Ödendi</span></td>
-                                <td><button class="text-btn btn-detail" data-no="INV-2026-005" data-cari="Zirve Enerji" data-turu="E-Fatura" data-tarih="25.07.2026" data-tutar="₺22.000" data-durum="Ödendi">Detay</button></td>
-                            </tr>
-                        </tbody>
+                        <tbody id="invoice-table-body"></tbody>
                     </table>
                 </div>
                 <div class="empty-state" data-empty-for="#invoice-table-body">
@@ -220,13 +172,12 @@
             </div>
             <div class="modal-body">
                 <div style="display:grid; grid-template-columns:1fr 1fr; gap:12px; margin-bottom:16px; font-size:13px;">
-                    <div><strong>Müşteri / Cari:</strong> <span id="m-cari">ABC Teknoloji</span></div>
-                    <div><strong>Kesim Tarihi:</strong> <span id="m-tarih">03.08.2026</span></div>
-                    <div><strong>Durum:</strong> <span id="m-durum">Ödendi</span></div>
-                    <div><strong>Ödeme Yöntemi:</strong> Banka Havalesi / EFT</div>
+                    <div><strong>Müşteri / Cari:</strong> <span id="m-cari">—</span></div>
+                    <div><strong>Kesim Tarihi:</strong> <span id="m-tarih">—</span></div>
+                    <div><strong>Durum:</strong> <span id="m-durum">—</span></div>
+                    <div><strong>Vade Tarihi:</strong> <span id="m-vade">—</span></div>
                 </div>
 
-           
                 <table class="invoice-preview-table">
                     <thead>
                         <tr style="background:#f8fafc;">
@@ -236,24 +187,18 @@
                             <th>Tutar</th>
                         </tr>
                     </thead>
-                    <tbody>
-                        <tr>
-                            <td>Yazılım & Danışmanlık Hizmeti</td>
-                            <td>1 Adet</td>
-                            <td>%20</td>
-                            <td id="m-kalem-tutar">₺12.500,00</td>
-                        </tr>
-                    </tbody>
+                    <tbody id="m-kalemler"></tbody>
                 </table>
 
                 <div class="invoice-summary">
                     <div style="font-size:15px; font-weight:bold; color:var(--primary); margin-top:8px;">
-                        Genel Toplam: <span id="m-toplam">₺12.500,00</span>
+                        Genel Toplam: <span id="m-toplam">—</span>
                     </div>
                 </div>
             </div>
             <div style="display:flex; justify-content:flex-end; gap:10px; margin-top:20px; border-top:1px solid #f1f5f9; padding-top:12px;">
                 <button class="btn btn-secondary" id="closeModalBtn">Kapat</button>
+                <button class="btn btn-primary" type="button" id="btn-pay-invoice" hidden>Ödeme Yap →</button>
                 <button class="btn btn-primary" type="button" id="btn-pdf-invoice">PDF İndir</button>
             </div>
         </div>
@@ -262,64 +207,123 @@
     <script src="../assets/js/script.js"></script>
     <script>
         document.addEventListener('DOMContentLoaded', function () {
-    
+
             const searchInput = document.getElementById('filter-search');
             const statusSelect = document.getElementById('filter-status');
             const typeSelect = document.getElementById('filter-type');
-            const rows = document.querySelectorAll('#invoice-table-body tr');
+            const branchSelect = document.getElementById('filter-branch');
+            const tableBody = document.getElementById('invoice-table-body');
+            const money = (n) => '₺' + Number(n || 0).toLocaleString('tr-TR', { minimumFractionDigits: 2 });
+            const dateTr = (d) => d ? new Date(d).toLocaleDateString('tr-TR') : '—';
 
-            function filterInvoices() {
-                const query = searchInput.value.toLowerCase().trim();
-                const selectedStatus = statusSelect.value;
-                const selectedType = typeSelect.value;
-
-                rows.forEach(row => {
-                    const no = row.cells[0].innerText.toLowerCase();
-                    const cari = row.cells[1].innerText.toLowerCase();
-                    const type = row.cells[2].innerText;
-                    const status = row.querySelector('.badge').innerText;
-
-                    const matchesSearch = no.includes(query) || cari.includes(query);
-                    const matchesStatus = (selectedStatus === 'Tüm Durumlar') || (status === selectedStatus);
-                    const matchesType = (selectedType === 'Tüm Türler') || (type === selectedType);
-
-                    if (matchesSearch && matchesStatus && matchesType) {
-                        row.style.display = '';
-                    } else {
-                        row.style.display = 'none';
+            async function loadBranches() {
+                const businessId = activeBusinessId();
+                if (!businessId) return;
+                try {
+                    const branches = await apiFetch('/api/businesses/' + businessId + '/branches');
+                    if (branches.length > 1) {
+                        branches.forEach((b) => {
+                            const opt = document.createElement('option');
+                            opt.value = b.id;
+                            opt.textContent = b.sube_adi;
+                            branchSelect.appendChild(opt);
+                        });
+                        branchSelect.hidden = false;
                     }
-                });
+                } catch {}
             }
 
-            searchInput.addEventListener('input', filterInvoices);
-            statusSelect.addEventListener('change', filterInvoices);
-            typeSelect.addEventListener('change', filterInvoices);
+            function statusBadgeClass(durum) {
+                if (durum === 'Ödendi') return 'success';
+                if (durum === 'Gecikti') return 'danger';
+                return 'warning';
+            }
+
+            function renderRow(inv) {
+                const tr = document.createElement('tr');
+                tr.innerHTML = `
+            <td></td>
+            <td></td>
+            <td></td>
+            <td></td>
+            <td></td>
+            <td class="money"></td>
+            <td><span class="badge ${statusBadgeClass(inv.durum)}"></span></td>
+            <td><button class="text-btn btn-detail">Detay</button></td>
+          `;
+                tr.children[0].textContent = inv.fatura_no;
+                tr.children[1].textContent = inv.cari;
+                tr.children[2].textContent = inv.fatura_turu;
+                tr.children[3].textContent = dateTr(inv.tarih);
+                tr.children[4].textContent = dateTr(inv.vade);
+                tr.querySelector('.money').textContent = money(inv.tutar);
+                tr.querySelector('.badge').textContent = inv.durum;
+                tr.querySelector('.btn-detail').addEventListener('click', () => openDetail(inv.id));
+                return tr;
+            }
+
+            async function loadInvoices() {
+                const params = new URLSearchParams();
+                if (searchInput.value.trim()) params.set('search', searchInput.value.trim());
+                if (statusSelect.value !== 'Tüm Durumlar') params.set('status', statusSelect.value);
+                if (typeSelect.value !== 'Tüm Türler') params.set('type', typeSelect.value);
+                if (branchSelect.value) params.set('branch_id', branchSelect.value);
+
+                try {
+                    const list = await apiFetch('/api/invoices?' + params.toString());
+                    tableBody.innerHTML = '';
+                    list.forEach((inv) => tableBody.appendChild(renderRow(inv)));
+                    syncEmptyStates();
+                } catch (err) {
+                    showToast(err.message || 'Faturalar alınamadı', 'error');
+                }
+            }
+
+            let debounce;
+            searchInput.addEventListener('input', () => { clearTimeout(debounce); debounce = setTimeout(loadInvoices, 300); });
+            statusSelect.addEventListener('change', loadInvoices);
+            typeSelect.addEventListener('change', loadInvoices);
+            branchSelect.addEventListener('change', loadInvoices);
 
             const modal = document.getElementById('invoiceModal');
             const closeModal = document.getElementById('closeModal');
             const closeModalBtn = document.getElementById('closeModalBtn');
-            const detailBtns = document.querySelectorAll('.btn-detail');
+            const payBtn = document.getElementById('btn-pay-invoice');
+            let currentInvoiceId = null;
 
-            detailBtns.forEach(btn => {
-                btn.addEventListener('click', function () {
-                    const no = this.getAttribute('data-no');
-                    const cari = this.getAttribute('data-cari');
-                    const turu = this.getAttribute('data-turu');
-                    const tarih = this.getAttribute('data-tarih');
-                    const tutar = this.getAttribute('data-tutar');
-                    const durum = this.getAttribute('data-durum');
+            async function openDetail(id) {
+                try {
+                    const inv = await apiFetch('/api/invoices/' + id);
+                    currentInvoiceId = inv.id;
+                    document.getElementById('m-fatura-no').innerText = inv.fatura_no;
+                    document.getElementById('m-fatura-turu').innerText = inv.fatura_turu;
+                    document.getElementById('m-cari').innerText = inv.cari_adi;
+                    document.getElementById('m-tarih').innerText = dateTr(inv.kesim_tarihi);
+                    document.getElementById('m-vade').innerText = dateTr(inv.vade_tarihi);
+                    document.getElementById('m-durum').innerText = inv.durum;
+                    document.getElementById('m-toplam').innerText = money(inv.tutar);
 
-                    document.getElementById('m-fatura-no').innerText = no;
-                    document.getElementById('m-fatura-turu').innerText = turu;
-                    document.getElementById('m-cari').innerText = cari;
-                    document.getElementById('m-tarih').innerText = tarih;
-                    document.getElementById('m-durum').innerText = durum;
-                    document.getElementById('m-kalem-tutar').innerText = tutar;
-                    document.getElementById('m-toplam').innerText = tutar;
+                    const beklemede = inv.durum === 'Bekliyor' || inv.durum === 'Gecikti';
+                    closeModalBtn.hidden = beklemede;
+                    payBtn.hidden = !beklemede;
+
+                    const kalemlerBody = document.getElementById('m-kalemler');
+                    kalemlerBody.innerHTML = '';
+                    (inv.kalemler || []).forEach((k) => {
+                        const tr = document.createElement('tr');
+                        tr.innerHTML = `<td></td><td></td><td></td><td></td>`;
+                        tr.children[0].textContent = k.aciklama;
+                        tr.children[1].textContent = k.miktar + ' Adet';
+                        tr.children[2].textContent = '%' + k.kdv_orani;
+                        tr.children[3].textContent = money(k.tutar);
+                        kalemlerBody.appendChild(tr);
+                    });
 
                     modal.classList.add('active');
-                });
-            });
+                } catch (err) {
+                    showToast(err.message || 'Fatura detayı alınamadı', 'error');
+                }
+            }
 
             function hideModal() {
                 modal.classList.remove('active');
@@ -330,6 +334,42 @@
             modal.addEventListener('click', function (e) {
                 if (e.target === modal) hideModal();
             });
+
+            payBtn.addEventListener('click', async function () {
+                if (!currentInvoiceId) return;
+                payBtn.disabled = true;
+                try {
+                    const result = await apiFetch('/api/invoices/' + currentInvoiceId + '/payment', { method: 'POST' });
+                    if (result.paymentPageUrl) {
+                        window.location.href = result.paymentPageUrl;
+                        return;
+                    }
+                    if (result.demo) {
+                        showToast('Demo ödeme alındı — fatura Ödendi');
+                        hideModal();
+                        loadInvoices();
+                        payBtn.disabled = false;
+                        return;
+                    }
+                    showToast('Ödeme yanıtı alınamadı', 'error');
+                    payBtn.disabled = false;
+                } catch (err) {
+                    showToast(err.message || 'Ödeme başlatılamadı', 'error');
+                    payBtn.disabled = false;
+                }
+            });
+
+            const paymentParam = new URLSearchParams(window.location.search).get('payment');
+            if (paymentParam === 'success') {
+                showToast('Ödeme alındı, fatura ödendi olarak işaretlendi');
+            } else if (paymentParam === 'failed') {
+                showToast('Ödeme tamamlanamadı', 'error');
+            }
+            if (paymentParam) {
+                history.replaceState(null, '', window.location.pathname);
+            }
+
+            loadBranches().then(loadInvoices);
         });
     </script>
 </body>

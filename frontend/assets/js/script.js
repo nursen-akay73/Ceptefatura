@@ -167,6 +167,18 @@ document.addEventListener("DOMContentLoaded", () => {
     showToast("Şifre sıfırlama bağlantısı e-postanıza gönderildi");
   });
 
+  document.querySelectorAll("[data-password-toggle]").forEach((btn) => {
+    btn.addEventListener("click", () => {
+      const input = btn.closest(".input-password")?.querySelector("input");
+      if (!input) return;
+      const show = input.type === "password";
+      input.type = show ? "text" : "password";
+      btn.classList.toggle("is-visible", show);
+      btn.setAttribute("aria-label", show ? "Şifreyi gizle" : "Şifreyi göster");
+      btn.title = show ? "Şifreyi gizle" : "Şifreyi göster";
+    });
+  });
+
   document.querySelectorAll("[data-auth-form]").forEach((form) => {
     form.addEventListener("submit", async (e) => {
       e.preventDefault();
@@ -187,7 +199,10 @@ document.addEventListener("DOMContentLoaded", () => {
           return;
         }
         if (data.token) localStorage.setItem("token", data.token);
-        if (data.user) saveSessionUser(data.user);
+        if (data.user) {
+          saveSessionUser(data.user);
+          if (data.user.activeBusinessId) setActiveBusinessId(data.user.activeBusinessId);
+        }
         if (mode === "login") {
           try {
             if (remember?.checked && body.email) localStorage.setItem("cf_email", body.email);
@@ -321,10 +336,14 @@ document.addEventListener("DOMContentLoaded", () => {
     const btn = e.target.closest(".js-switch-company");
     if (!btn) return;
     e.preventDefault();
+    const businessId = btn.dataset.businessId
+      || btn.closest("tr")?.dataset.businessId
+      || document.getElementById("companyModal")?.dataset.businessId;
     const name = btn.dataset.company
       || btn.closest("tr")?.querySelector("strong")?.textContent.trim()
       || document.getElementById("m-isletme-adi")?.textContent.trim();
-    if (!name) return;
+    if (!businessId || !name) return;
+    setActiveBusinessId(businessId);
     try { sessionStorage.setItem("cf_company", name); } catch {}
     showToast(name + " hesabına geçildi");
     setTimeout(() => { window.location.href = "dashboard.html"; }, 450);
@@ -371,26 +390,6 @@ document.addEventListener("DOMContentLoaded", () => {
     el.addEventListener("change", () => setTimeout(syncEmptyStates, 0));
     el.addEventListener("click", () => setTimeout(syncEmptyStates, 0));
   });
-  const expenseBody = document.getElementById("expense-table-body");
-  if (expenseBody) {
-    const card = expenseBody.closest(".card");
-    const search = card?.querySelector(".filter-row input");
-    const category = card?.querySelector(".filter-row select");
-    const applyExpenseFilter = () => {
-      const q = (search?.value || "").toLowerCase().trim();
-      const cat = category?.value || "";
-      expenseBody.querySelectorAll("tr").forEach((row) => {
-        const text = row.innerText.toLowerCase();
-        const matchesSearch = !q || text.includes(q);
-        const matchesCat = !cat || cat === "Tüm Kategoriler" || row.cells[2]?.innerText === cat;
-        row.style.display = matchesSearch && matchesCat ? "" : "none";
-      });
-      syncEmptyStates();
-    };
-    search?.addEventListener("input", applyExpenseFilter);
-    category?.addEventListener("change", applyExpenseFilter);
-  }
-
   syncEmptyStates();
 
   if (page === "dashboard") initCashflowChart();
@@ -478,6 +477,8 @@ function saveSessionUser(user) {
       ad_soyad: user.ad_soyad,
       isletme_adi: user.isletme_adi,
       email: user.email,
+      businesses: user.businesses || [],
+      activeBusinessId: user.activeBusinessId || null,
     }));
   } catch {}
 }
@@ -486,8 +487,45 @@ function clearSession() {
   try {
     localStorage.removeItem("token");
     localStorage.removeItem("cf_user");
+    localStorage.removeItem("cf_business_id");
     sessionStorage.removeItem("cf_company");
   } catch {}
+}
+
+function activeBusinessId() {
+  try { return localStorage.getItem("cf_business_id") || ""; } catch { return ""; }
+}
+
+function setActiveBusinessId(id) {
+  try {
+    if (id) localStorage.setItem("cf_business_id", id);
+    else localStorage.removeItem("cf_business_id");
+  } catch {}
+}
+
+async function apiFetch(path, opts = {}) {
+  const token = localStorage.getItem("token");
+  const headers = { ...(opts.headers || {}) };
+  if (token) headers.Authorization = "Bearer " + token;
+  const bizId = activeBusinessId();
+  if (bizId) headers["X-Business-Id"] = bizId;
+  if (opts.body && !(opts.body instanceof FormData) && typeof opts.body !== "string") {
+    headers["Content-Type"] = "application/json";
+    opts = { ...opts, body: JSON.stringify(opts.body) };
+  } else if (opts.body && typeof opts.body === "string") {
+    headers["Content-Type"] = "application/json";
+  }
+
+  const res = await fetch(path, { ...opts, headers });
+  let data = null;
+  try { data = await res.json(); } catch {}
+  if (!res.ok) {
+    const err = new Error((data && data.error) || "İstek başarısız");
+    err.status = res.status;
+    err.data = data;
+    throw err;
+  }
+  return data;
 }
 
 function userInitial(name) {
@@ -498,7 +536,10 @@ function userInitial(name) {
 function paintUserMenu(user) {
   const full = (user && user.ad_soyad) || "Nurşen";
   const first = full.trim().split(/\s+/)[0] || "Nurşen";
-  const role = sessionStorage.getItem("cf_company") ? "Mali Müşavir" : "İşletme Yöneticisi";
+  const businesses = (user && user.businesses) || [];
+  const activeId = activeBusinessId() || (user && user.activeBusinessId) || "";
+  const active = businesses.find((b) => b.id === activeId) || businesses[0];
+  const role = active && active.role === "musavir" ? "Mali Müşavir" : "İşletme Yöneticisi";
   const nameEl = document.getElementById("user-name");
   const roleEl = document.getElementById("user-role");
   const avatar = document.getElementById("user-avatar");
@@ -515,12 +556,12 @@ async function applyUserMenu() {
   const token = localStorage.getItem("token");
   if (!token) return;
   try {
-    const res = await fetch("/api/auth/me", {
-      headers: { Authorization: "Bearer " + token },
-    });
-    if (!res.ok) return;
-    const data = await res.json();
+    const data = await apiFetch("/api/auth/me");
     if (data && data.ad_soyad) {
+      const list = data.businesses || [];
+      const current = activeBusinessId();
+      const stillValid = current && list.some((b) => b.id === current);
+      if (!stillValid && data.activeBusinessId) setActiveBusinessId(data.activeBusinessId);
       saveSessionUser(data);
       paintUserMenu(data);
       fillSettingsUser(data);
@@ -601,16 +642,25 @@ function applyCompanyContext() {
   let name = "";
   try { name = sessionStorage.getItem("cf_company") || ""; } catch {}
   if (!name || document.body.classList.contains("auth-page")) return;
-  if (document.querySelector(".context-banner")) return;
+  document.querySelector(".context-banner")?.remove();
   const bar = document.createElement("div");
   bar.className = "context-banner";
-  bar.innerHTML = `<span><strong>${name}</strong> adına işlem yapıyorsunuz</span><button type="button" id="exit-firm-context">Kendi hesabıma dön</button>`;
+  bar.setAttribute("role", "status");
+  bar.innerHTML = `
+    <div class="context-banner-main">
+      <span class="context-banner-badge">Aktif işletme</span>
+      <p class="context-banner-text"><strong>${escapeHtml(name)}</strong> adına işlem yapıyorsunuz</p>
+    </div>
+    <button type="button" id="exit-firm-context">Kendi hesabıma dön</button>`;
   const header = document.getElementById("header-container");
   if (header) header.insertAdjacentElement("afterend", bar);
   else document.querySelector(".main")?.prepend(bar);
+  document.body.classList.add("has-firm-context");
   document.getElementById("exit-firm-context")?.addEventListener("click", () => {
     try { sessionStorage.removeItem("cf_company"); } catch {}
+    setActiveBusinessId(null);
     bar.remove();
+    document.body.classList.remove("has-firm-context");
     showToast("Kendi hesabınıza döndünüz");
   });
 }
@@ -1024,12 +1074,14 @@ function localAssistantAnswer(message, page) {
 
 async function askCepteAsistan(message, page) {
   const token = localStorage.getItem("token");
+  const bizId = typeof activeBusinessId === "function" ? activeBusinessId() : "";
   try {
     const res = await fetch("/api/assistant/chat", {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
         ...(token ? { Authorization: "Bearer " + token } : {}),
+        ...(bizId ? { "X-Business-Id": bizId } : {}),
       },
       body: JSON.stringify({ message, page }),
     });
@@ -1040,6 +1092,7 @@ async function askCepteAsistan(message, page) {
           text: data.reply || data.text,
           href: data.href,
           hrefLabel: data.hrefLabel,
+          pending_action: data.pending_action,
         };
       }
     }
@@ -1083,8 +1136,14 @@ function mountCepteAsistan(page) {
       </form>
     </div>
     <button type="button" class="cf-asst-fab" data-asst-toggle aria-label="Cepte Asistan">
-      <svg xmlns="http://www.w3.org/2000/svg" width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M7.9 20A9 9 0 1 0 4 16.1L2 22Z"/><path d="M8 12h.01"/><path d="M12 12h.01"/><path d="M16 12h.01"/></svg>
+      <img src="../assets/img/logo-icon.png" alt="" width="84" height="84">
     </button>`;
+  const backdrop = document.createElement("button");
+  backdrop.type = "button";
+  backdrop.className = "cf-asst-backdrop";
+  backdrop.setAttribute("aria-label", "Asistanı kapat");
+  backdrop.tabIndex = -1;
+  document.body.appendChild(backdrop);
   document.body.appendChild(root);
 
   const panel = root.querySelector(".cf-asst-panel");
@@ -1124,6 +1183,47 @@ function mountCepteAsistan(page) {
         a.textContent = item.hrefLabel || "Sayfaya git";
         el.appendChild(a);
       }
+      if (item.pending_action) {
+        const action = item.pending_action;
+        const actions = document.createElement("div");
+        actions.className = "cf-asst-confirm";
+        const confirmBtn = document.createElement("button");
+        confirmBtn.type = "button";
+        confirmBtn.className = "cf-asst-confirm-yes";
+        confirmBtn.textContent = action.label || "Onayla";
+        const cancelBtn = document.createElement("button");
+        cancelBtn.type = "button";
+        cancelBtn.className = "cf-asst-confirm-no";
+        cancelBtn.textContent = "Vazgeç";
+        actions.appendChild(confirmBtn);
+        actions.appendChild(cancelBtn);
+        el.appendChild(actions);
+
+        confirmBtn.addEventListener("click", async () => {
+          confirmBtn.disabled = true;
+          cancelBtn.disabled = true;
+          try {
+            await apiFetch(action.endpoint, { method: action.method, body: action.payload });
+            actions.remove();
+            const doneP = document.createElement("p");
+            doneP.className = "cf-asst-confirm-done";
+            doneP.textContent = "Yapıldı.";
+            el.appendChild(doneP);
+            showToast((action.label || "İşlem") + " tamamlandı");
+          } catch (err) {
+            confirmBtn.disabled = false;
+            cancelBtn.disabled = false;
+            showToast(err.message || "İşlem başarısız", "error");
+          }
+        });
+        cancelBtn.addEventListener("click", () => {
+          actions.remove();
+          const cancelP = document.createElement("p");
+          cancelP.className = "cf-asst-confirm-done";
+          cancelP.textContent = "Vazgeçildi.";
+          el.appendChild(cancelP);
+        });
+      }
     }
     msgs.appendChild(el);
     msgs.scrollTop = msgs.scrollHeight;
@@ -1145,6 +1245,7 @@ function mountCepteAsistan(page) {
   function setOpen(open) {
     panel.hidden = !open;
     root.classList.toggle("is-open", open);
+    document.body.classList.toggle("asst-open", open);
     if (open) {
       input.focus();
     } else if (window.speechSynthesis) {
@@ -1170,13 +1271,15 @@ function mountCepteAsistan(page) {
     busy = false;
   }
 
-  addMsg("bot", { text: meta.hello });
+  addMsg("bot", { text: meta.
+    hello });
   addChips();
 
   root.querySelector("[data-asst-toggle]").addEventListener("click", () => {
     setOpen(panel.hidden);
   });
   root.querySelector("[data-asst-close]").addEventListener("click", () => setOpen(false));
+  backdrop.addEventListener("click", () => setOpen(false));
   voiceBtn.addEventListener("click", () => {
     voiceOn = !voiceOn;
     voiceBtn.setAttribute("aria-pressed", voiceOn ? "true" : "false");

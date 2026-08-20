@@ -34,7 +34,7 @@
                 </div>
             </div>
 
-            <form class="card form-card" data-demo-form data-redirect="expenses.html" data-toast="Gider kaydedildi">
+            <form class="card form-card" id="form-new-expense">
                 <div class="form-grid">
                     <div class="form-group">
                         <label>Firma</label>
@@ -99,5 +99,47 @@
         </main>
     </div>
     <script src="../assets/js/script.js"></script>
+    <script>
+        document.addEventListener('DOMContentLoaded', function () {
+            const tarihInput = document.getElementById('gider-tarih');
+            tarihInput.value = new Date().toISOString().slice(0, 10);
+
+            document.getElementById('form-new-expense').addEventListener('submit', async function (e) {
+                e.preventDefault();
+                const tarih = tarihInput.value;
+                const tutar = document.getElementById('gider-tutar').value;
+                const kategori = document.getElementById('gider-kategori').value;
+                const kaynak = document.getElementById('gider-kaynak').value;
+                const aciklama = document.getElementById('gider_aciklama').value.trim();
+                const firma = document.getElementById('gider-firma').value.trim();
+                const file = document.getElementById('ocr-file').files[0];
+
+                if (!tarih || tutar === '' || !kategori) {
+                    showToast('Tarih, tutar ve kategori zorunludur', 'error');
+                    return;
+                }
+
+                const formData = new FormData();
+                formData.append('tarih', tarih);
+                formData.append('tutar', tutar);
+                formData.append('kategori', kategori);
+                formData.append('kaynak', kaynak);
+                if (aciklama) formData.append('aciklama', aciklama);
+                if (firma) formData.append('firma', firma);
+                if (file) formData.append('fis', file);
+
+                const submitBtn = this.querySelector('button[type=submit]');
+                if (submitBtn) submitBtn.disabled = true;
+                try {
+                    await apiFetch('/api/expenses', { method: 'POST', body: formData });
+                    showToast('Gider kaydedildi');
+                    setTimeout(() => { window.location.href = 'expenses.html'; }, 600);
+                } catch (err) {
+                    showToast(err.message || 'Gider kaydedilemedi', 'error');
+                    if (submitBtn) submitBtn.disabled = false;
+                }
+            });
+        });
+    </script>
 </body>
 </html>

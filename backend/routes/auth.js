@@ -2,7 +2,7 @@ const router = require("express").Router();
 const bcrypt = require("bcryptjs");
 const jwt = require("jsonwebtoken");
 const { pool } = require("../db");
-const { requireAuth } = require("../middleware/auth");
+const { requireAuth, ensureDefaultBusiness } = require("../middleware/auth");
 
 router.post("/register", async (req, res) => {
   const { ad_soyad, isletme_adi, email, sifre, sifre_tekrar } = req.body || {};
@@ -14,21 +14,45 @@ router.post("/register", async (req, res) => {
     return res.status(400).json({ error: "şifreler eşleşmiyor" });
   }
 
+  const client = await pool.connect();
   try {
     const sifreHash = await bcrypt.hash(sifre, 10);
-    const { rows } = await pool.query(
+    await client.query("BEGIN");
+
+    const { rows } = await client.query(
       `INSERT INTO users (ad_soyad, isletme_adi, email, sifre_hash)
        VALUES ($1, $2, $3, $4)
        RETURNING id, ad_soyad, isletme_adi, email, created_at`,
       [ad_soyad, isletme_adi, email, sifreHash]
     );
-    res.status(201).json(rows[0]);
+    const user = rows[0];
+
+    const { rows: businessRows } = await client.query(
+      `INSERT INTO businesses (isletme_adi) VALUES ($1) RETURNING id`,
+      [isletme_adi]
+    );
+    const businessId = businessRows[0].id;
+
+    await client.query(
+      `INSERT INTO branches (business_id, sube_adi) VALUES ($1, 'Merkez Şube')`,
+      [businessId]
+    );
+    await client.query(
+      `INSERT INTO user_businesses (user_id, business_id, role) VALUES ($1, $2, 'sahip')`,
+      [user.id, businessId]
+    );
+
+    await client.query("COMMIT");
+    res.status(201).json(user);
   } catch (err) {
+    await client.query("ROLLBACK");
     if (err.code === "23505") {
       return res.status(409).json({ error: "bu e-posta zaten kayıtlı" });
     }
     console.error(err);
     res.status(500).json({ error: "kayıt başarısız" });
+  } finally {
+    client.release();
   }
 });
 
@@ -53,7 +77,26 @@ router.post("/login", async (req, res) => {
 
     const token = jwt.sign({ user_id: user.id }, process.env.JWT_SECRET, { expiresIn: "7d" });
     delete user.sifre_hash;
-    res.json({ token, user });
+
+    await ensureDefaultBusiness(user.id);
+    const { rows: businesses } = await pool.query(
+      `SELECT b.id, b.isletme_adi, ub.role
+       FROM user_businesses ub
+       JOIN businesses b ON b.id = ub.business_id
+       WHERE ub.user_id = $1 AND ub.status = 'onaylandi'
+       ORDER BY (ub.role = 'sahip') DESC, b.isletme_adi`,
+      [user.id]
+    );
+    const activeBusiness = businesses.find((b) => b.role === "sahip") || businesses[0] || null;
+
+    res.json({
+      token,
+      user: {
+        ...user,
+        businesses,
+        activeBusinessId: activeBusiness ? activeBusiness.id : null,
+      },
+    });
   } catch (err) {
     console.error(err);
     res.status(500).json({ error: "giriş başarısız" });
@@ -67,7 +110,23 @@ router.get("/me", requireAuth, async (req, res) => {
       [req.userId]
     );
     if (!rows[0]) return res.status(404).json({ error: "kullanıcı bulunamadı" });
-    res.json(rows[0]);
+
+    await ensureDefaultBusiness(req.userId);
+    const { rows: businesses } = await pool.query(
+      `SELECT b.id, b.isletme_adi, ub.role
+       FROM user_businesses ub
+       JOIN businesses b ON b.id = ub.business_id
+       WHERE ub.user_id = $1 AND ub.status = 'onaylandi'
+       ORDER BY (ub.role = 'sahip') DESC, b.isletme_adi`,
+      [req.userId]
+    );
+    const activeBusiness = businesses.find((b) => b.role === "sahip") || businesses[0] || null;
+
+    res.json({
+      ...rows[0],
+      businesses,
+      activeBusinessId: activeBusiness ? activeBusiness.id : null,
+    });
   } catch (err) {
     console.error(err);
     res.status(500).json({ error: "kullanıcı alınamadı" });

@@ -25,35 +25,34 @@
                 </div>
             </div>
 
-            <form class="card form-card" data-demo-form data-redirect="invoices.html" data-toast="Fatura kaydedildi">
+            <form class="card form-card" id="form-new-invoice">
                 <div class="form-grid">
                     <div class="form-group">
                         <label>Fatura No</label>
-                        <input type="text" value="INV-2026-004" readonly style="background:#f8fafc;">
+                        <input type="text" value="Kaydedince otomatik atanır" readonly style="background:#f8fafc;">
                     </div>
                     <div class="form-group">
                         <label>Cari / Müşteri</label>
-                        <select id="select-cari">
-                            <option>ABC Teknoloji</option>
-                            <option selected>XYZ Danışmanlık</option>
-                            <option>Beta Lojistik</option>
-                            <option>Gamma Yazılım & Donanım</option>
-                        </select>
+                        <select id="select-cari"></select>
+                    </div>
+                    <div class="form-group" id="branch-field" hidden>
+                        <label>Şube</label>
+                        <select id="select-branch"></select>
                     </div>
                     <div class="form-group">
                         <label>Fatura Türü</label>
-                        <select>
+                        <select id="select-fatura-turu">
                             <option>E-Fatura</option>
                             <option>E-Arşiv</option>
                         </select>
                     </div>
                     <div class="form-group">
                         <label>Kesim Tarihi</label>
-                        <input type="date" value="2026-08-06">
+                        <input type="date" id="kesim-tarihi">
                     </div>
                     <div class="form-group">
                         <label>Vade Tarihi</label>
-                        <input type="date" value="2026-09-06">
+                        <input type="date" id="vade-tarihi">
                     </div>
                     <div class="form-group">
                         <label>Fatura Notu</label>
@@ -132,21 +131,50 @@
 
     <script src="../assets/js/script.js"></script>
     <script>
-        document.addEventListener('DOMContentLoaded', function () {
-          
+        document.addEventListener('DOMContentLoaded', async function () {
+
             const urlParams = new URLSearchParams(window.location.search);
             const selectedCariFromUrl = urlParams.get('cari');
-            if (selectedCariFromUrl) {
-                const selectCari = document.getElementById('select-cari');
-                for (let i = 0; i < selectCari.options.length; i++) {
-                    if (selectCari.options[i].text.toLowerCase() === selectedCariFromUrl.toLowerCase()) {
-                        selectCari.selectedIndex = i;
-                        break;
-                    }
+            const selectCari = document.getElementById('select-cari');
+            const selectBranch = document.getElementById('select-branch');
+            const branchField = document.getElementById('branch-field');
+            const kesimInput = document.getElementById('kesim-tarihi');
+            const vadeInput = document.getElementById('vade-tarihi');
+
+            const today = new Date();
+            const inMonth = new Date(today.getFullYear(), today.getMonth() + 1, today.getDate());
+            kesimInput.value = today.toISOString().slice(0, 10);
+            vadeInput.value = inMonth.toISOString().slice(0, 10);
+
+            try {
+                const cariler = await apiFetch('/api/accounts');
+                selectCari.innerHTML = cariler
+                    .map((c) => `<option value="${c.id}">${escapeHtml(c.cari_adi)}</option>`)
+                    .join('');
+                if (selectedCariFromUrl) {
+                    const match = cariler.find((c) => c.cari_adi.toLowerCase() === selectedCariFromUrl.toLowerCase());
+                    if (match) selectCari.value = match.id;
                 }
+                if (!cariler.length) {
+                    showToast('Önce Cari Hesaplar sayfasından bir cari ekleyin', 'error');
+                }
+            } catch (err) {
+                showToast(err.message || 'Cariler alınamadı', 'error');
             }
 
-          
+            try {
+                const businessId = activeBusinessId();
+                if (businessId) {
+                    const branches = await apiFetch('/api/businesses/' + businessId + '/branches');
+                    if (branches.length > 1) {
+                        selectBranch.innerHTML = branches
+                            .map((b) => `<option value="${b.id}">${escapeHtml(b.sube_adi)}</option>`)
+                            .join('');
+                        branchField.hidden = false;
+                    }
+                }
+            } catch {}
+
             const itemsBody = document.getElementById('items-body');
             const btnAddRow = document.getElementById('btn-add-row');
 
@@ -224,6 +252,42 @@
                     } else {
                         showToast("En az bir fatura kalemi bulunmalıdır.", "error");
                     }
+                }
+            });
+
+            document.getElementById('form-new-invoice').addEventListener('submit', async function (e) {
+                e.preventDefault();
+                if (!selectCari.value) {
+                    showToast('Önce bir cari seçin', 'error');
+                    return;
+                }
+                const kalemler = [...itemsBody.querySelectorAll('tr')].map((row) => ({
+                    aciklama: row.querySelector('.item-desc').value,
+                    miktar: row.querySelector('.item-qty').value,
+                    birim_fiyat: row.querySelector('.item-price').value,
+                    kdv_orani: row.querySelector('.item-vat').value,
+                }));
+
+                const submitBtn = this.querySelector('button[type=submit]');
+                if (submitBtn) submitBtn.disabled = true;
+                try {
+                    await apiFetch('/api/invoices', {
+                        method: 'POST',
+                        body: {
+                            account_id: selectCari.value,
+                            branch_id: branchField.hidden ? null : selectBranch.value,
+                            fatura_turu: document.getElementById('select-fatura-turu').value,
+                            kesim_tarihi: kesimInput.value,
+                            vade_tarihi: vadeInput.value,
+                            fatura_notu: document.getElementById('fatura_notu').value,
+                            kalemler,
+                        },
+                    });
+                    showToast('Fatura kaydedildi');
+                    setTimeout(() => { window.location.href = 'invoices.html'; }, 600);
+                } catch (err) {
+                    showToast(err.message || 'Fatura kaydedilemedi', 'error');
+                    if (submitBtn) submitBtn.disabled = false;
                 }
             });
         });

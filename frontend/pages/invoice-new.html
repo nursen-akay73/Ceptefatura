@@ -25,6 +25,22 @@
                 </div>
             </div>
 
+            <div class="card" id="scan-card" style="margin-bottom:16px;">
+                <div style="display:flex; justify-content:space-between; align-items:center; gap:12px; flex-wrap:wrap;">
+                    <div>
+                        <h3 style="font-size:15px; margin:0 0 4px 0;">Görüntüden Otomatik Doldur</h3>
+                        <p style="margin:0; font-size:13px; color:var(--muted);">Bir fatura/fiş görüntüsü veya PDF yükleyin, alanlar otomatik doldurulsun.</p>
+                    </div>
+                    <div style="display:flex; gap:10px;">
+                        <button type="button" class="btn btn-secondary" id="btn-scan-camera">📷 Kamerayı Aç</button>
+                        <button type="button" class="btn btn-secondary" id="btn-scan-upload">📁 Dosya Yükle</button>
+                    </div>
+                </div>
+                <input type="file" id="scan-camera-input" accept="image/*" capture="environment" style="display:none;">
+                <input type="file" id="scan-file-input" accept="image/*,application/pdf" style="display:none;">
+                <div id="scan-status" style="display:none; margin-top:10px; font-size:13px; color:var(--muted);">Görüntü taranıyor, lütfen bekleyin...</div>
+            </div>
+
             <form class="card form-card" id="invoice-form">
                 <div class="form-grid">
                     <div class="form-group">
@@ -96,7 +112,7 @@
                                     </div>
                                 </td>
                                 <td><input class="table-input item-qty" type="number" value="1" min="1"></td>
-                                <td><input class="table-input item-price" type="number" value="8750"></td>
+                                <td><input class="table-input item-price" type="number" value="0"></td>
                                 <td>
                                     <select class="table-input item-vat">
                                         <option value="20" selected>%20</option>
@@ -245,6 +261,97 @@
                     }
                 }
             });
+
+            function itemRowHtml(item) {
+                const desc = (item?.aciklama || '').toString();
+                const qty = item?.miktar ?? 1;
+                const price = item?.birim_fiyat ?? 0;
+                const vat = item?.kdv_orani ?? 20;
+                return `
+              <td>
+                <div class="input-mic">
+                  <input class="table-input item-desc" placeholder="Konuşun, faturaya yazılsın..." value="${desc.replace(/"/g, '&quot;')}">
+                  <button type="button" class="mic-btn" title="Sesle yaz">🎤</button>
+                </div>
+              </td>
+              <td><input class="table-input item-qty" type="number" value="${qty}" min="1"></td>
+              <td><input class="table-input item-price" type="number" value="${price}"></td>
+              <td>
+                <select class="table-input item-vat">
+                  <option value="20"${Number(vat) === 20 ? ' selected' : ''}>%20</option>
+                  <option value="10"${Number(vat) === 10 ? ' selected' : ''}>%10</option>
+                  <option value="1"${Number(vat) === 1 ? ' selected' : ''}>%1</option>
+                  <option value="0"${Number(vat) === 0 ? ' selected' : ''}>%0</option>
+                </select>
+              </td>
+              <td class="item-total money" style="font-weight:600;">₺0,00</td>
+              <td><button type="button" class="text-btn btn-delete-row" style="color:var(--danger);">Sil</button></td>
+            `;
+            }
+
+            function fillFormFromScan(data) {
+                if (data.cari_adi) {
+                    const target = data.cari_adi.toLowerCase();
+                    let matched = false;
+                    for (let i = 0; i < selectCari.options.length; i++) {
+                        const optText = selectCari.options[i].text.toLowerCase();
+                        if (optText === target || optText.includes(target) || target.includes(optText)) {
+                            selectCari.selectedIndex = i;
+                            matched = true;
+                            break;
+                        }
+                    }
+                    if (!matched) {
+                        showToast(`"${data.cari_adi}" isimli cari bulunamadı, lütfen listeden manuel seçin.`, 'error');
+                    }
+                }
+                if (data.tarih) document.getElementById('kesim_tarihi').value = data.tarih;
+                if (data.vade_tarihi) document.getElementById('vade_tarihi').value = data.vade_tarihi;
+                if (data.fatura_notu) document.getElementById('fatura_notu').value = data.fatura_notu;
+
+                if (Array.isArray(data.kalemler) && data.kalemler.length > 0) {
+                    itemsBody.innerHTML = '';
+                    data.kalemler.forEach(item => {
+                        const tr = document.createElement('tr');
+                        tr.innerHTML = itemRowHtml(item);
+                        itemsBody.appendChild(tr);
+                    });
+                    calculateTotals();
+                }
+                showToast('Görüntüden bilgiler dolduruldu, lütfen kontrol edip kaydedin.');
+            }
+
+            async function handleScanFile(file) {
+                if (!file) return;
+                const scanStatus = document.getElementById('scan-status');
+                scanStatus.style.display = 'block';
+                try {
+                    const formData = new FormData();
+                    formData.append('belge', file);
+                    const res = await authFetch('/api/invoices/scan', { method: 'POST', body: formData });
+                    if (res.status === 401) {
+                        window.location.href = 'login.html';
+                        return;
+                    }
+                    const data = await res.json();
+                    if (!res.ok) {
+                        showToast(data.error || 'Görüntü okunamadı', 'error');
+                        return;
+                    }
+                    fillFormFromScan(data);
+                } catch {
+                    showToast('Sunucuya bağlanılamadı. npm run dev çalışıyor mu?', 'error');
+                } finally {
+                    scanStatus.style.display = 'none';
+                }
+            }
+
+            const scanCameraInput = document.getElementById('scan-camera-input');
+            const scanFileInput = document.getElementById('scan-file-input');
+            document.getElementById('btn-scan-camera')?.addEventListener('click', () => scanCameraInput.click());
+            document.getElementById('btn-scan-upload')?.addEventListener('click', () => scanFileInput.click());
+            scanCameraInput.addEventListener('change', () => handleScanFile(scanCameraInput.files[0]));
+            scanFileInput.addEventListener('change', () => handleScanFile(scanFileInput.files[0]));
 
             const invoiceForm = document.getElementById('invoice-form');
             invoiceForm.addEventListener('submit', async function (e) {

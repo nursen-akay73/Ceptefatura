@@ -1,12 +1,31 @@
+const fs = require("fs");
 const router = require("express").Router();
 const { pool } = require("../db");
 const { requireAuth } = require("../middleware/auth");
+const { upload } = require("../middleware/upload");
+const { extractInvoiceFromDocument } = require("../services/documentScan");
 
 const TURLER = ["E-Fatura", "E-Arşiv"];
 const DURUMLAR = ["Ödendi", "Bekliyor", "Gecikti"];
 const SIKLIKLAR = ["Haftalık", "Aylık", "3 Aylık", "Yıllık"];
 
 router.use(requireAuth);
+
+router.post("/scan", upload.single("belge"), async (req, res) => {
+  if (!req.file) {
+    return res.status(400).json({ error: "Görüntü/PDF yüklenmedi" });
+  }
+  try {
+    const fileBuffer = fs.readFileSync(req.file.path);
+    const extracted = await extractInvoiceFromDocument(fileBuffer, req.file.mimetype);
+    res.json(extracted);
+  } catch (err) {
+    console.error(err);
+    res.status(err.status || 500).json({ error: err.message || "Görüntü işlenemedi" });
+  } finally {
+    fs.unlink(req.file.path, () => {});
+  }
+});
 
 function kalemTutar(k) {
   const miktar = Number(k.miktar || 1);

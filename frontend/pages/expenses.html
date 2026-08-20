@@ -25,20 +25,22 @@
             </div>
 
             <div class="grid stats">
-                <div class="card stat-card"><span class="label">Toplam Gider</span><div class="value">₺32.000</div></div>
-                <div class="card stat-card"><span class="label">Bu Ay Belge</span><div class="value">24</div></div>
-                <div class="card stat-card"><span class="label">İndirilecek KDV</span><div class="value">₺5.760</div></div>
-                <div class="card stat-card"><span class="label">Bekleyen Belge</span><div class="value">3</div></div>
+                <div class="card stat-card"><span class="label">Toplam Gider</span><div class="value" id="stat-toplam">₺0,00</div></div>
+                <div class="card stat-card"><span class="label">Bu Ay Belge</span><div class="value" id="stat-belge">0</div></div>
+                <div class="card stat-card"><span class="label">İndirilecek KDV</span><div class="value" id="stat-kdv">₺0,00</div></div>
+                <div class="card stat-card"><span class="label">Bekleyen Belge</span><div class="value" id="stat-bekleyen">0</div></div>
             </div><br>
 
             <div class="card">
                 <div class="filter-row">
-                    <input type="search" placeholder="Firma veya açıklama ara">
-                    <select>
+                    <input type="search" id="filter-search" placeholder="Firma veya açıklama ara">
+                    <select id="filter-kategori">
                         <option>Tüm Kategoriler</option>
                         <option>Ofis</option>
                         <option>Ulaşım</option>
                         <option>Hizmet</option>
+                        <option>Yemek / Temsil</option>
+                        <option>Diğer</option>
                     </select>
                 </div>
                 <div class="table-wrap">
@@ -46,11 +48,7 @@
                         <thead>
                             <tr><th>TARİH</th><th>FİRMA</th><th>KATEGORİ</th><th class="money">TUTAR</th><th>KAYNAK</th><th>DURUM</th></tr>
                         </thead>
-                        <tbody id="expense-table-body">
-                            <tr><td>03.08.2026</td><td>ABC Ofis</td><td>Ofis</td><td class="money">₺2.500,00</td><td>Manuel</td><td><span class="badge success">İşlendi</span></td></tr>
-                            <tr><td>02.08.2026</td><td>Hızlı Kargo</td><td>Ulaşım</td><td class="money">₺850,00</td><td>OCR</td><td><span class="badge success">İşlendi</span></td></tr>
-                            <tr><td>01.08.2026</td><td>Teknik Servis</td><td>Hizmet</td><td class="money">₺1.750,00</td><td>OCR</td><td><span class="badge warning">Kontrol Bekliyor</span></td></tr>
-                        </tbody>
+                        <tbody id="expense-table-body"></tbody>
                     </table>
                 </div>
                 <div class="empty-state" data-empty-for="#expense-table-body">
@@ -64,5 +62,94 @@
         </main>
     </div>
     <script src="../assets/js/script.js"></script>
+    <script>
+        document.addEventListener('DOMContentLoaded', async function () {
+            const searchInput = document.getElementById('filter-search');
+            const kategoriSelect = document.getElementById('filter-kategori');
+            const tbody = document.getElementById('expense-table-body');
+            let allExpenses = [];
+
+            function formatMoneyTR(n) {
+                return '₺' + Number(n || 0).toLocaleString('tr-TR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+            }
+
+            function formatDateTR(iso) {
+                if (!iso) return '-';
+                const [y, m, d] = String(iso).slice(0, 10).split('-');
+                return `${d}.${m}.${y}`;
+            }
+
+            function durumBadgeClass(durum) {
+                return durum === 'Kontrol Bekliyor' ? 'warning' : 'success';
+            }
+
+            function renderExpenses(list) {
+                tbody.innerHTML = list.map(e => `
+                    <tr>
+                        <td>${formatDateTR(e.tarih)}</td>
+                        <td>${e.firma || '-'}</td>
+                        <td>${e.kategori}</td>
+                        <td class="money">${formatMoneyTR(e.tutar)}</td>
+                        <td>${e.kaynak}</td>
+                        <td><span class="badge ${durumBadgeClass(e.durum)}">${e.durum}</span></td>
+                    </tr>
+                `).join('');
+                syncEmptyStates();
+            }
+
+            function applyFilters() {
+                const query = searchInput.value.toLowerCase().trim();
+                const kategori = kategoriSelect.value;
+                const filtered = allExpenses.filter(e => {
+                    const matchesSearch = !query
+                        || (e.firma || '').toLowerCase().includes(query)
+                        || (e.aciklama || '').toLowerCase().includes(query);
+                    const matchesKategori = kategori === 'Tüm Kategoriler' || e.kategori === kategori;
+                    return matchesSearch && matchesKategori;
+                });
+                renderExpenses(filtered);
+            }
+
+            async function loadStats() {
+                try {
+                    const res = await authFetch('/api/expenses/stats');
+                    if (res.status === 401) {
+                        window.location.href = 'login.html';
+                        return;
+                    }
+                    const data = await res.json();
+                    if (!res.ok) return;
+                    document.getElementById('stat-toplam').textContent = formatMoneyTR(data.toplam_gider);
+                    document.getElementById('stat-belge').textContent = data.bu_ay_belge ?? 0;
+                    document.getElementById('stat-kdv').textContent = formatMoneyTR(data.indirilecek_kdv);
+                    document.getElementById('stat-bekleyen').textContent = data.bekleyen_belge ?? 0;
+                } catch {}
+            }
+
+            async function loadExpenses() {
+                try {
+                    const res = await authFetch('/api/expenses');
+                    if (res.status === 401) {
+                        window.location.href = 'login.html';
+                        return;
+                    }
+                    const data = await res.json();
+                    if (!res.ok) {
+                        showToast(data.error || 'Giderler alınamadı', 'error');
+                        return;
+                    }
+                    allExpenses = data;
+                    applyFilters();
+                } catch {
+                    showToast('Sunucuya bağlanılamadı. npm run dev çalışıyor mu?', 'error');
+                }
+            }
+
+            searchInput.addEventListener('input', applyFilters);
+            kategoriSelect.addEventListener('change', applyFilters);
+
+            await Promise.all([loadStats(), loadExpenses()]);
+        });
+    </script>
 </body>
 </html>

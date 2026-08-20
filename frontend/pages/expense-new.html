@@ -34,7 +34,7 @@
                 </div>
             </div>
 
-            <form class="card form-card" data-demo-form data-redirect="expenses.html" data-toast="Gider kaydedildi">
+            <form class="card form-card" id="expense-form">
                 <div class="form-grid">
                     <div class="form-group">
                         <label>Firma</label>
@@ -99,5 +99,57 @@
         </main>
     </div>
     <script src="../assets/js/script.js"></script>
+    <script>
+        document.addEventListener('DOMContentLoaded', function () {
+            const form = document.getElementById('expense-form');
+            const ocrFileInput = document.getElementById('ocr-file');
+
+            form.addEventListener('submit', async function (e) {
+                e.preventDefault();
+
+                const tarih = document.getElementById('gider-tarih').value;
+                const tutar = document.getElementById('gider-tutar').value;
+                const kategori = document.getElementById('gider-kategori').value;
+
+                if (!tarih || tutar === '' || !kategori) {
+                    showToast('Tarih, tutar ve kategori zorunludur.', 'error');
+                    return;
+                }
+
+                const formData = new FormData();
+                formData.append('tarih', tarih);
+                formData.append('tutar', tutar);
+                formData.append('kategori', kategori);
+                formData.append('kaynak', document.getElementById('gider-kaynak').value);
+                formData.append('firma', document.getElementById('gider-firma').value || '');
+                formData.append('aciklama', document.getElementById('gider_aciklama').value || '');
+                if (ocrFileInput?.files?.[0]) {
+                    formData.append('fis', ocrFileInput.files[0]);
+                }
+
+                const submitBtn = form.querySelector('button[type="submit"]');
+                if (submitBtn) submitBtn.disabled = true;
+
+                try {
+                    const res = await authFetch('/api/expenses', { method: 'POST', body: formData });
+                    if (res.status === 401) {
+                        window.location.href = 'login.html';
+                        return;
+                    }
+                    const data = await res.json();
+                    if (!res.ok) {
+                        showToast(data.error || 'Gider oluşturulamadı', 'error');
+                        return;
+                    }
+                    showToast('Gider kaydedildi');
+                    setTimeout(() => { window.location.href = 'expenses.html'; }, 600);
+                } catch {
+                    showToast('Sunucuya bağlanılamadı. npm run dev çalışıyor mu?', 'error');
+                } finally {
+                    if (submitBtn) submitBtn.disabled = false;
+                }
+            });
+        });
+    </script>
 </body>
 </html>

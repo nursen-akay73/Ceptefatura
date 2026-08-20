@@ -1,7 +1,10 @@
+const fs = require("fs");
 const router = require("express").Router();
 const Iyzipay = require("iyzipay");
 const { pool } = require("../db");
 const { requireAuth, resolveBusinessContext } = require("../middleware/auth");
+const { upload } = require("../middleware/upload");
+const { extractInvoiceFromDocument } = require("../services/documentScan");
 const { getClient: getIyzicoClient, isConfigured: isIyzicoConfigured } = require("../lib/iyzico");
 
 const TURLER = ["E-Fatura", "E-Arşiv"];
@@ -63,6 +66,22 @@ router.post("/:id/payment-callback", async (req, res) => {
 });
 
 router.use(requireAuth, resolveBusinessContext);
+
+router.post("/scan", upload.single("belge"), async (req, res) => {
+  if (!req.file) {
+    return res.status(400).json({ error: "Görüntü yüklenmedi" });
+  }
+  try {
+    const fileBuffer = fs.readFileSync(req.file.path);
+    const extracted = await extractInvoiceFromDocument(fileBuffer, req.file.mimetype);
+    res.json(extracted);
+  } catch (err) {
+    console.error(err);
+    res.status(err.status || 500).json({ error: err.message || "Görüntü işlenemedi" });
+  } finally {
+    fs.unlink(req.file.path, () => {});
+  }
+});
 
 function kalemTutar(k) {
   const miktar = Number(k.miktar || 1);

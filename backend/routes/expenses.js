@@ -1,12 +1,30 @@
 const router = require("express").Router();
+const fs = require("fs");
 const { pool } = require("../db");
 const { requireAuth, resolveBusinessContext } = require("../middleware/auth");
 const { upload } = require("../middleware/upload");
+const { extractExpenseFromDocument } = require("../services/documentScan");
 
 const KATEGORILER = ["Ofis", "Ulaşım", "Hizmet", "Yemek / Temsil", "Diğer"];
 const KAYNAKLAR = ["Manuel", "OCR", "Banka Entegrasyonu"];
 
 router.use(requireAuth, resolveBusinessContext);
+
+router.post("/scan", upload.single("fis"), async (req, res) => {
+  if (!req.file) {
+    return res.status(400).json({ error: "Görüntü yüklenmedi" });
+  }
+  try {
+    const fileBuffer = fs.readFileSync(req.file.path);
+    const extracted = await extractExpenseFromDocument(fileBuffer, req.file.mimetype);
+    res.json(extracted);
+  } catch (err) {
+    console.error(err);
+    res.status(err.status || 500).json({ error: err.message || "Görüntü işlenemedi" });
+  } finally {
+    fs.unlink(req.file.path, () => {});
+  }
+});
 
 router.get("/stats", async (req, res) => {
   try {
@@ -114,11 +132,20 @@ router.post("/upload", upload.single("fis"), async (req, res) => {
   if (!req.file) {
     return res.status(400).json({ error: "Dosya yok" });
   }
-  res.status(201).json({
-    belge_yolu: `/uploads/${req.file.filename}`,
-    ocr: null,
-    not: "OCR şimdilik yok, alanları elle gir",
-  });
+  try {
+    const fileBuffer = fs.readFileSync(req.file.path);
+    const ocr = await extractExpenseFromDocument(fileBuffer, req.file.mimetype);
+    res.status(201).json({
+      belge_yolu: `/uploads/${req.file.filename}`,
+      ocr,
+    });
+  } catch (err) {
+    res.status(201).json({
+      belge_yolu: `/uploads/${req.file.filename}`,
+      ocr: null,
+      not: err.message || "OCR okunamadı, alanları elle gir",
+    });
+  }
 });
 
 router.use((err, _req, res, _next) => {

@@ -260,23 +260,32 @@
 
             function fillFormFromScan(data) {
                 if (data.cari_adi) {
-                    const target = String(data.cari_adi).toLowerCase();
+                    const target = String(data.cari_adi).toLowerCase().trim();
+                    const noise = /^(bilgileri?|bilgi|ad[ıi]|unvan[ıi]|fatura|müşteri|alıcı)$/i.test(target);
                     let matched = false;
-                    for (let i = 0; i < selectCari.options.length; i++) {
-                        const optText = selectCari.options[i].text.toLowerCase();
-                        if (optText === target || optText.includes(target) || target.includes(optText)) {
-                            selectCari.selectedIndex = i;
-                            matched = true;
-                            break;
+                    if (!noise && target.length >= 3) {
+                        for (let i = 0; i < selectCari.options.length; i++) {
+                            const optText = selectCari.options[i].text.toLowerCase();
+                            if (
+                                optText === target ||
+                                (optText.length >= 3 && (optText.includes(target) || target.includes(optText)))
+                            ) {
+                                selectCari.selectedIndex = i;
+                                matched = true;
+                                break;
+                            }
                         }
-                    }
-                    if (!matched) {
-                        showToast('"' + data.cari_adi + '" cari bulunamadı, listeden seçin.', 'error');
+                        if (!matched) {
+                            // Kırmızı hata değil: OCR isim buldu ama cari hesaplarda yok
+                            showToast(
+                              'OCR cari: "' + data.cari_adi + '". Listede yoksa Cari / Müşteri’den seçin veya yeni cari ekleyin.'
+                            );
+                        }
                     }
                 }
                 if (data.tarih) kesimInput.value = data.tarih;
                 if (data.vade_tarihi) vadeInput.value = data.vade_tarihi;
-                if (data.fatura_notu) {
+                if (data.fatura_notu && !/fatura\s*tarih|senaryo|fatura\s*tip|bilgi/i.test(data.fatura_notu)) {
                     const note = document.getElementById('fatura_notu');
                     if (note) note.value = data.fatura_notu;
                 }

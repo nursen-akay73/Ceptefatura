@@ -726,64 +726,196 @@ function showToast(message, type = "success") {
   setTimeout(() => el.remove(), 4000);
 }
 
-function startSpeechToText(inputEl, micBtn, onEnd) {
+let _activeSpeechRecognition = null;
+let _activeMicStream = null;
+
+function stopMicStream() {
+  if (_activeMicStream) {
+    _activeMicStream.getTracks().forEach((t) => t.stop());
+    _activeMicStream = null;
+  }
+}
+
+async function startSpeechToText(inputEl, micBtn, onEnd) {
   const SpeechRecognitionImpl = window.SpeechRecognition || window.webkitSpeechRecognition;
   if (!SpeechRecognitionImpl) {
-    showToast("Tarayıcınız sesle yazmayı desteklemiyor. Chrome veya Edge'de deneyin.", "error");
+    showToast("Ses tanıma bu tarayıcıda yok. Chrome kullanın.", "error");
     return;
   }
 
-  const wrap = micBtn.closest(".input-mic");
-  const recognition = new SpeechRecognitionImpl();
-  recognition.lang = "tr-TR";
-  recognition.interimResults = true;
-  recognition.maxAlternatives = 1;
+  // İkinci tık = bitir
+  if (_activeSpeechRecognition) {
+    try {
+      _activeSpeechRecognition.stop();
+    } catch {}
+    return;
+  }
 
-  micBtn.disabled = true;
-  micBtn.classList.add("mic-listening");
-  wrap?.classList.add("listening");
+  if (window.speechSynthesis) window.speechSynthesis.cancel();
+
+  const wrap = micBtn.closest(".input-mic") || micBtn.closest(".cf-asst-form");
   const originalTitle = micBtn.title;
   const originalPlaceholder = inputEl.placeholder;
-  const baseValue = inputEl.value.trim();
-  micBtn.title = "Dinleniyor...";
-  inputEl.placeholder = "Dinleniyor...";
+
+  let finalTranscript = "";
+  let interimTranscript = "";
+  let finished = false;
+  let watchTimer = null;
+  let levelTimer = null;
+
+  function paintInput() {
+    const text = [finalTranscript, interimTranscript].filter(Boolean).join(" ").trim();
+    inputEl.value = text;
+  }
+
+  function cleanupUi() {
+    micBtn.classList.remove("mic-listening");
+    micBtn.setAttribute("aria-pressed", "false");
+    wrap?.classList.remove("listening");
+    micBtn.title = originalTitle;
+    inputEl.placeholder = originalPlaceholder || "Sorunuzu yazın veya konuşun...";
+    micBtn.style.removeProperty("--mic-level");
+    if (watchTimer) clearTimeout(watchTimer);
+    if (levelTimer) clearInterval(levelTimer);
+    watchTimer = null;
+    levelTimer = null;
+    _activeSpeechRecognition = null;
+    stopMicStream();
+  }
+
+  function finish() {
+    if (finished) return;
+    finished = true;
+    try {
+      if (_activeSpeechRecognition) _activeSpeechRecognition.stop();
+    } catch {}
+    const spoken = (finalTranscript || interimTranscript || inputEl.value || "").trim();
+    cleanupUi();
+    if (spoken) {
+      inputEl.value = spoken;
+      if (typeof onEnd === "function") onEnd(spoken);
+    } else {
+      showToast("Metin algılanamadı. Yazıp Gönder’e basabilir veya tekrar deneyin.", "error");
+    }
+  }
+
+  // 1) Önce gerçek mikrofon erişimi — tanıma çoğu zaman bundan sonra çalışır
+  try {
+    if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+      showToast("Mikrofon API’si yok. HTTPS veya localhost + Chrome gerekli.", "error");
+      return;
+    }
+    _activeMicStream = await navigator.mediaDevices.getUserMedia({
+      audio: { echoCancellation: true, noiseSuppression: true },
+    });
+  } catch (err) {
+    showToast("Mikrofon izni gerekli. Adres çubuğundan izin verin.", "error");
+    return;
+  }
+
+  // Ses seviyesi göstergesi (mik gerçekten çalışıyor mu?)
+  try {
+    const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+    const source = audioCtx.createMediaStreamSource(_activeMicStream);
+    const analyser = audioCtx.createAnalyser();
+    analyser.fftSize = 256;
+    source.connect(analyser);
+    const data = new Uint8Array(analyser.frequencyBinCount);
+    levelTimer = setInterval(() => {
+      analyser.getByteFrequencyData(data);
+      let sum = 0;
+      for (let i = 0; i < data.length; i++) sum += data[i];
+      const avg = sum / data.length / 255;
+      micBtn.style.setProperty("--mic-level", String(Math.min(1, avg * 3)));
+      if (avg > 0.05) inputEl.placeholder = "Sizi duyuyorum… konuşmaya devam";
+    }, 100);
+    micBtn._audioCtx = audioCtx;
+  } catch {}
+
+  const recognition = new SpeechRecognitionImpl();
+  _activeSpeechRecognition = recognition;
+  recognition.lang = "tr-TR";
+  recognition.interimResults = true;
+  recognition.continuous = false;
+  recognition.maxAlternatives = 1;
+
+  micBtn.classList.add("mic-listening");
+  micBtn.setAttribute("aria-pressed", "true");
+  wrap?.classList.add("listening");
+  micBtn.title = "Dinleniyor… Bitirmek için tekrar tıklayın";
+  inputEl.placeholder = "Şimdi net konuşun…";
+  inputEl.value = "";
+  showToast("Mikrofon açık — şimdi konuşun (örn. yeni fatura aç)");
 
   recognition.onresult = (event) => {
-    let finalText = "";
-    let interimText = "";
-    for (let i = 0; i < event.results.length; i += 1) {
-      const piece = event.results[i][0].transcript.trim();
-      if (event.results[i].isFinal) finalText += (finalText ? " " : "") + piece;
-      else interimText += (interimText ? " " : "") + piece;
+    interimTranscript = "";
+    for (let i = event.resultIndex; i < event.results.length; i++) {
+      const piece = (event.results[i][0].transcript || "").trim();
+      if (!piece) continue;
+      if (event.results[i].isFinal) finalTranscript = (finalTranscript + " " + piece).trim();
+      else interimTranscript = piece;
     }
-    const parts = [baseValue, finalText, interimText].filter(Boolean);
-    inputEl.value = parts.join(" ");
-    inputEl.dispatchEvent(new Event("input", { bubbles: true }));
-    inputEl.focus();
+    paintInput();
+    // Final parça geldiyse hemen işle
+    if (finalTranscript) {
+      setTimeout(() => finish(), 150);
+    }
   };
 
   recognition.onerror = (event) => {
-    if (event.error === "not-allowed" || event.error === "service-not-allowed") {
-      showToast("Mikrofon izni reddedildi.", "error");
-    } else if (event.error !== "aborted" && event.error !== "no-speech") {
-      showToast("Ses tanıma hatası: " + event.error, "error");
+    const err = event.error;
+    if (err === "aborted") return;
+    if (err === "not-allowed" || err === "service-not-allowed") {
+      finished = true;
+      cleanupUi();
+      showToast("Mikrofon engelli. Chrome ayarlarından izin verin.", "error");
+      return;
     }
+    if (err === "network") {
+      finished = true;
+      cleanupUi();
+      showToast("Ses tanıma internet ister. Bağlantıyı kontrol edin.", "error");
+      return;
+    }
+    if (err === "no-speech") {
+      // Bir tur daha dene
+      try {
+        recognition.start();
+        return;
+      } catch {
+        finish();
+      }
+      return;
+    }
+    showToast("Ses hatası: " + err, "error");
+    finish();
   };
 
   recognition.onend = () => {
-    micBtn.disabled = false;
-    micBtn.classList.remove("mic-listening");
-    wrap?.classList.remove("listening");
-    micBtn.title = originalTitle;
-    inputEl.placeholder = originalPlaceholder || "Konuşun, faturaya yazılsın...";
-    if (typeof onEnd === "function") onEnd(inputEl.value);
+    if (finished) return;
+    if (finalTranscript || interimTranscript) {
+      finish();
+      return;
+    }
+    // Tek yeniden deneme
+    if (!recognition._retried) {
+      recognition._retried = true;
+      try {
+        recognition.start();
+        return;
+      } catch {}
+    }
+    finish();
   };
+
+  watchTimer = setTimeout(() => finish(), 10000);
 
   try {
     recognition.start();
-  } catch {
-    micBtn.disabled = false;
-    micBtn.classList.remove("mic-listening");
+  } catch (e) {
+    finished = true;
+    cleanupUi();
+    showToast("Ses tanıma başlatılamadı.", "error");
   }
 }
 
@@ -1039,10 +1171,93 @@ const CF_ASSISTANT_KB = [
   },
 ];
 
+function resolveVoiceCommand(message) {
+  const q = foldTr(message);
+  if (!q) return null;
+
+  const rules = [
+    {
+      test: /(yeni\s*fatura|fatura\s*kes|fatura\s*olustur|fatura\s*ac)/,
+      href: "invoice-new.html",
+      label: "Yeni Fatura",
+      text: "Yeni fatura sayfasını açıyorum.",
+    },
+    {
+      test: /(otomatik\s*fatura|tekrarlayan|sablon)/,
+      href: "invoice-template.html",
+      label: "Otomatik Fatura",
+      text: "Otomatik fatura şablonuna gidiyorum.",
+    },
+    {
+      test: /(faturalar|fatura\s*listesi|faturalara\s*(git|ac|goster))/,
+      href: "invoices.html",
+      label: "Faturalar",
+      text: "Faturalar listesini açıyorum.",
+    },
+    {
+      test: /(yeni\s*gider|gider\s*(ekle|kaydet|ac)|fis\s*(yukle|tara|ac)|ocr)/,
+      href: "expense-new.html",
+      label: "Yeni Gider",
+      text: "Yeni gider / fiş yükleme sayfasını açıyorum.",
+    },
+    {
+      test: /(giderler|gider\s*listesi)/,
+      href: "expenses.html",
+      label: "Giderler",
+      text: "Giderler sayfasını açıyorum.",
+    },
+    {
+      test: /(cari|musteri\s*listesi|carilere)/,
+      href: "accounts.html",
+      label: "Cari Hesaplar",
+      text: "Cari hesaplar sayfasını açıyorum.",
+    },
+    {
+      test: /(rapor|kdv\s*ozet|nakit\s*ozet)/,
+      href: "reports.html",
+      label: "Raporlar",
+      text: "Raporlar sayfasını açıyorum.",
+    },
+    {
+      test: /(muhasebeci|mali\s*musavir|musavir\s*panel)/,
+      href: "accountant.html",
+      label: "Muhasebeci Paneli",
+      text: "Muhasebeci panelini açıyorum.",
+    },
+    {
+      test: /(ayarlar|abonelik|gib)/,
+      href: "settings.html",
+      label: "Ayarlar",
+      text: "Ayarlar sayfasını açıyorum.",
+    },
+    {
+      test: /(ana\s*sayfa|dashboard|panele\s*don|basa\s*don)/,
+      href: "dashboard.html",
+      label: "Ana Sayfa",
+      text: "Ana sayfaya gidiyorum.",
+    },
+  ];
+
+  for (const rule of rules) {
+    if (rule.test.test(q)) {
+      return {
+        text: rule.text,
+        href: rule.href,
+        hrefLabel: rule.label + " →",
+        autoNav: true,
+      };
+    }
+  }
+  return null;
+}
+
 function localAssistantAnswer(message, page) {
+  const nav = resolveVoiceCommand(message);
+  if (nav) return nav;
+
   const q = foldTr(message);
   if (!q) {
-    return { text: "Bir soru yazın veya aşağıdaki hazır sorulardan birine tıklayın." };
+    return { text: "Bir soru yazın, mikrofona basıp konuşun veya hazır sorulardan birine tıklayın." };
   }
 
   const exact = CF_ASSISTANT_KB.find((item) => foldTr(item.q) === q);
@@ -1068,11 +1283,14 @@ function localAssistantAnswer(message, page) {
   if (best && bestScore >= 3) return best;
 
   return {
-    text: "Bunu net bilemedim. Fatura kesme, fiş yükleme, cari bakiye veya müşavir geçişi hakkında sorun. Vergi mevzuatı için mali müşavirinize danışın.",
+    text: "Bunu net bilemedim. Örnek: “yeni fatura aç”, “giderlere git”, “cari hesaplar”, “raporları göster”. Veya fatura / fiş / cari hakkında sorun.",
   };
 }
 
 async function askCepteAsistan(message, page) {
+  const nav = resolveVoiceCommand(message);
+  if (nav) return nav;
+
   const token = localStorage.getItem("token");
   const bizId = typeof activeBusinessId === "function" ? activeBusinessId() : "";
   try {
@@ -1267,13 +1485,43 @@ function mountCepteAsistan(page) {
     const answer = await askCepteAsistan(message, page);
     wait.remove();
     addMsg("bot", answer);
+    // Sayfa açma komutlarını seslendirme (küçük ifadeler)
+    if (answer.autoNav && answer.href) {
+      if (window.speechSynthesis) window.speechSynthesis.cancel();
+      busy = false;
+      showToast((answer.hrefLabel || "Sayfa") + " açılıyor…");
+      setTimeout(() => {
+        window.location.href = answer.href;
+      }, 450);
+      return;
+    }
     speak(answer.text);
     busy = false;
   }
 
-  addMsg("bot", { text: meta.
-    hello });
+  addMsg("bot", {
+    text: meta.hello + " Mikrofona basıp aşağıdaki kısa komutları söyleyin; yeşil yanınca konuşun, bitince mik’e tekrar basın.",
+  });
   addChips();
+
+  // Sesli komut kısayolları — tıklayınca da aynı (seslendirilmez)
+  const navChips = document.createElement("div");
+  navChips.className = "cf-asst-chips";
+  [
+    "yeni fatura aç",
+    "giderlere git",
+    "cari hesaplar",
+    "raporları göster",
+    "ana sayfa",
+  ].forEach((label) => {
+    const btn = document.createElement("button");
+    btn.type = "button";
+    btn.textContent = label;
+    btn.title = "Söyle veya tıkla — sayfa açılır, seslendirilmez";
+    btn.addEventListener("click", () => send(label));
+    navChips.appendChild(btn);
+  });
+  msgs.appendChild(navChips);
 
   root.querySelector("[data-asst-toggle]").addEventListener("click", () => {
     setOpen(panel.hidden);
@@ -1292,6 +1540,7 @@ function mountCepteAsistan(page) {
     send(input.value);
   });
   micBtn.addEventListener("click", () => {
+    // Dinlerken tekrar tık = bitir (startSpeechToText içinde)
     startSpeechToText(input, micBtn, (value) => {
       if (value && value.trim()) send(value);
     });

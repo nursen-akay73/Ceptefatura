@@ -241,7 +241,7 @@ body:not(.auth-page) {
     padding: 0 40px;
     position: sticky;
     top: 0;
-    z-index: 10;
+    z-index: 40;
     box-sizing: border-box;
 }
 
@@ -274,24 +274,55 @@ body:not(.auth-page) {
     display: flex;
     align-items: center;
     gap: 12px;
+    padding: 6px 10px 6px 6px;
+    border-radius: 999px;
+    border: 1px solid transparent;
+    transform-origin: right center;
+    transition: background 0.18s ease, border-color 0.18s ease, box-shadow 0.18s ease, transform 0.18s ease;
 }
 
+    .user-menu:hover,
+    .user-menu.open {
+        background: #f8fafc;
+        border-color: var(--border);
+        box-shadow: 0 6px 16px rgba(15, 23, 42, 0.08);
+        transform: scale(1.08);
+        z-index: 5;
+    }
+
 .avatar {
-    width: 40px;
-    height: 40px;
+    width: 48px;
+    height: 48px;
     border-radius: 50%;
     display: grid;
     place-items: center;
-    background: var(--primary-light);
-    color: var(--primary);
-    font-weight: 700;
-    border: 1px solid rgba(37, 99, 235, 0.15);
+    background: linear-gradient(145deg, #3b82f6 0%, #1d4ed8 100%);
+    color: #fff;
+    font-weight: 800;
+    font-size: 17px;
+    letter-spacing: -0.02em;
+    flex-shrink: 0;
+    border: 3px solid #fff;
+    box-shadow:
+        0 0 0 2px #2563eb,
+        0 6px 16px rgba(37, 99, 235, 0.35);
+    transition: transform 0.18s ease, box-shadow 0.18s ease;
 }
+
+    .user-menu:hover .avatar,
+    .user-menu.open .avatar {
+        transform: scale(1.12);
+        box-shadow:
+            0 0 0 2px #1d4ed8,
+            0 10px 22px rgba(37, 99, 235, 0.45);
+    }
 
 .user-menu strong {
     display: block;
     font-size: 13px;
     color: var(--text);
+    font-weight: 700;
+    transition: transform 0.18s ease;
 }
 
 .user-menu small {
@@ -1491,6 +1522,10 @@ body.auth-page {
     overflow: hidden;
 }
 
+    .ocr-progress.is-active {
+        display: block;
+    }
+
     .ocr-progress span {
         display: block;
         height: 100%;
@@ -1498,6 +1533,16 @@ body.auth-page {
         background: var(--primary);
         transition: width 0.4s ease;
     }
+
+    .ocr-progress.is-active span {
+        width: 100%;
+        animation: ocrPulse 1.2s ease-in-out infinite;
+    }
+
+@keyframes ocrPulse {
+    0%, 100% { opacity: 0.55; }
+    50% { opacity: 1; }
+}
 
 .toast-wrap {
     position: fixed;
@@ -1540,7 +1585,7 @@ body.auth-page {
     box-shadow: 0 8px 24px rgba(37, 99, 235, 0.28);
     position: sticky;
     top: 72px;
-    z-index: 15;
+    z-index: 20;
 }
 
 .context-banner-main {
@@ -1650,21 +1695,26 @@ body.asst-open .cf-asst-backdrop {
 .user-menu {
     position: relative;
     cursor: pointer;
+    z-index: 45;
 }
 
 .user-dropdown {
     display: none;
     position: absolute;
     right: 0;
-    top: calc(100% + 8px);
+    top: calc(100% + 10px);
     background: #fff;
     border: 1px solid var(--border);
-    border-radius: 8px;
-    box-shadow: 0 8px 24px rgba(15, 23, 42, 0.08);
-    min-width: 180px;
-    padding: 6px;
-    z-index: 30;
+    border-radius: 12px;
+    box-shadow: var(--shadow-card-hover);
+    min-width: 200px;
+    padding: 8px;
+    z-index: 50;
 }
+
+    .user-menu.open {
+        z-index: 55;
+    }
 
     .user-menu.open .user-dropdown {
         display: block;
@@ -2488,11 +2538,32 @@ body.auth-page.auth-split {
     }
 
     .cf-asst-iconbtn.mic-listening {
-        background: var(--primary-light);
-        border-color: var(--primary);
-        color: var(--primary);
-        animation: micPulse 1s ease-in-out infinite;
+        background: #ecfdf5;
+        border-color: #10b981;
+        color: #059669;
+        box-shadow: 0 0 0 calc(4px + (var(--mic-level, 0.2) * 14px)) rgba(16, 185, 129, calc(0.15 + var(--mic-level, 0.2) * 0.45));
+        animation: asstMicGlow 1.1s ease-out infinite;
     }
+
+@keyframes asstMicGlow {
+    0% {
+        box-shadow: 0 0 0 0 rgba(16, 185, 129, 0.55);
+        transform: scale(1);
+    }
+    55% {
+        box-shadow: 0 0 0 12px rgba(16, 185, 129, 0);
+        transform: scale(1.08);
+    }
+    100% {
+        box-shadow: 0 0 0 0 rgba(16, 185, 129, 0);
+        transform: scale(1);
+    }
+}
+
+.cf-asst-form.listening [data-asst-input] {
+    border-color: #10b981;
+    box-shadow: 0 0 0 3px rgba(16, 185, 129, 0.18);
+}
 
 .cf-asst-msgs {
     flex: 1;

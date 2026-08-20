@@ -143,96 +143,7 @@
                                 <th>İşlem</th>
                             </tr>
                         </thead>
-                        <tbody id="accounts-table-body">
-                            <tr data-type="musteri">
-                                <td><strong>ABC Teknoloji</strong></td>
-                                <td><span class="badge success">Müşteri</span></td>
-                                <td>1234567890</td>
-                                <td>0555 111 22 33</td>
-                                <td>info@abcteknoloji.com</td>
-                                <td class="money">₺25.000,00</td>
-                                <td><span class="badge credit">Alacak</span></td>
-                                <td>
-                                    <button class="text-btn btn-account-detail"
-                                            data-name="ABC Teknoloji"
-                                            data-role="Müşteri"
-                                            data-vno="1234567890"
-                                            data-phone="0555 111 22 33"
-                                            data-email="info@abcteknoloji.com"
-                                            data-balance="₺25.000,00"
-                                            data-status="Alacak"
-                                            data-address="İstanbul, Maslak Mah. No:12">
-                                        Detay
-                                    </button>
-                                </td>
-                            </tr>
-                            <tr data-type="musteri">
-                                <td><strong>XYZ Danışmanlık</strong></td>
-                                <td><span class="badge success">Müşteri</span></td>
-                                <td>9876543210</td>
-                                <td>0555 444 55 66</td>
-                                <td>info@xyz.com</td>
-                                <td class="money">₺8.750,00</td>
-                                <td><span class="badge credit">Alacak</span></td>
-                                <td>
-                                    <button class="text-btn btn-account-detail"
-                                            data-name="XYZ Danışmanlık"
-                                            data-role="Müşteri"
-                                            data-vno="9876543210"
-                                            data-phone="0555 444 55 66"
-                                            data-email="info@xyz.com"
-                                            data-balance="₺8.750,00"
-                                            data-status="Alacak"
-                                            data-address="Ankara, Çankaya No:45">
-                                        Detay
-                                    </button>
-                                </td>
-                            </tr>
-                            <tr data-type="tedarikci">
-                                <td><strong>Beta Lojistik</strong></td>
-                                <td><span class="badge warning">Tedarikçi</span></td>
-                                <td>4567890123</td>
-                                <td>0555 777 88 99</td>
-                                <td>info@beta.com</td>
-                                <td class="money">₺5.400,00</td>
-                                <td><span class="badge debit">Borç</span></td>
-                                <td>
-                                    <button class="text-btn btn-account-detail"
-                                            data-name="Beta Lojistik"
-                                            data-role="Tedarikçi"
-                                            data-vno="4567890123"
-                                            data-phone="0555 777 88 99"
-                                            data-email="info@beta.com"
-                                            data-balance="₺5.400,00"
-                                            data-status="Borç"
-                                            data-address="İzmir, Bornova No:88">
-                                        Detay
-                                    </button>
-                                </td>
-                            </tr>
-                            <tr data-type="tedarikci">
-                                <td><strong>Gamma Yazılım & Donanım</strong></td>
-                                <td><span class="badge warning">Tedarikçi</span></td>
-                                <td>3322114455</td>
-                                <td>0532 999 11 22</td>
-                                <td>destek@gammayazilim.com</td>
-                                <td class="money">₺0,00</td>
-                                <td><span class="badge balanced">Dengede</span></td>
-                                <td>
-                                    <button class="text-btn btn-account-detail"
-                                            data-name="Gamma Yazılım & Donanım"
-                                            data-role="Tedarikçi"
-                                            data-vno="3322114455"
-                                            data-phone="0532 999 11 22"
-                                            data-email="destek@gammayazilim.com"
-                                            data-balance="₺0,00"
-                                            data-status="Dengede"
-                                            data-address="Kocaeli, Gebze Teknopark">
-                                        Detay
-                                    </button>
-                                </td>
-                            </tr>
-                        </tbody>
+                        <tbody id="accounts-table-body"></tbody>
                     </table>
                 </div>
                 <div class="empty-state" data-empty-for="#accounts-table-body">
@@ -340,29 +251,95 @@
 
     <script src="../assets/js/script.js"></script>
     <script>
-        document.addEventListener('DOMContentLoaded', function () {
+        document.addEventListener('DOMContentLoaded', async function () {
             const searchInput = document.getElementById('search-accounts');
             const tabBtns = document.querySelectorAll('.tab-btn');
-            const rows = document.querySelectorAll('#accounts-table-body tr');
+            const tbody = document.getElementById('accounts-table-body');
 
             let activeType = 'tum';
+            let allAccounts = [];
+
+            function formatMoneyTR(n) {
+                return '₺' + Number(n || 0).toLocaleString('tr-TR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+            }
+
+            function roleLabel(turu) {
+                if (turu === 'musteri') return 'Müşteri';
+                if (turu === 'tedarikci') return 'Tedarikçi';
+                return turu || '-';
+            }
+
+            function roleBadgeClass(turu) {
+                if (turu === 'musteri') return 'success';
+                if (turu === 'tedarikci') return 'warning';
+                return '';
+            }
+
+            function statusFor(bakiye) {
+                const n = Number(bakiye || 0);
+                if (n > 0) return { text: 'Alacak', cls: 'credit' };
+                if (n < 0) return { text: 'Borç', cls: 'debit' };
+                return { text: 'Dengede', cls: 'balanced' };
+            }
+
+            function renderAccounts(list) {
+                tbody.innerHTML = list.map(a => {
+                    const status = statusFor(a.bakiye);
+                    return `
+                    <tr data-type="${a.turu || ''}">
+                        <td><strong>${a.cari_adi}</strong></td>
+                        <td><span class="badge ${roleBadgeClass(a.turu)}">${roleLabel(a.turu)}</span></td>
+                        <td>${a.vergi_no || '-'}</td>
+                        <td>${a.telefon || '-'}</td>
+                        <td>${a.email || '-'}</td>
+                        <td class="money">${formatMoneyTR(a.bakiye)}</td>
+                        <td><span class="badge ${status.cls}">${status.text}</span></td>
+                        <td>
+                            <button class="text-btn btn-account-detail"
+                                    data-id="${a.id}"
+                                    data-name="${a.cari_adi}"
+                                    data-role="${roleLabel(a.turu)}"
+                                    data-vno="${a.vergi_no || '-'}"
+                                    data-phone="${a.telefon || '-'}"
+                                    data-email="${a.email || '-'}"
+                                    data-balance="${formatMoneyTR(a.bakiye)}"
+                                    data-status="${status.text}">
+                                Detay
+                            </button>
+                        </td>
+                    </tr>`;
+                }).join('');
+                syncEmptyStates();
+            }
 
             function filterTable() {
                 const query = searchInput.value.toLowerCase().trim();
-
-                rows.forEach(row => {
-                    const rowType = row.getAttribute('data-type');
-                    const text = row.innerText.toLowerCase();
-
-                    const matchesTab = (activeType === 'tum') || (rowType === activeType);
-                    const matchesSearch = text.includes(query);
-
-                    if (matchesTab && matchesSearch) {
-                        row.style.display = '';
-                    } else {
-                        row.style.display = 'none';
-                    }
+                const filtered = allAccounts.filter(a => {
+                    const matchesTab = (activeType === 'tum') || (a.turu === activeType);
+                    const text = [a.cari_adi, a.vergi_no, a.telefon, a.email].filter(Boolean).join(' ').toLowerCase();
+                    const matchesSearch = !query || text.includes(query);
+                    return matchesTab && matchesSearch;
                 });
+                renderAccounts(filtered);
+            }
+
+            async function loadAccounts() {
+                try {
+                    const res = await authFetch('/api/accounts');
+                    if (res.status === 401) {
+                        window.location.href = 'login.html';
+                        return;
+                    }
+                    const data = await res.json();
+                    if (!res.ok) {
+                        showToast(data.error || 'Cariler alınamadı', 'error');
+                        return;
+                    }
+                    allAccounts = data;
+                    filterTable();
+                } catch {
+                    showToast('Sunucuya bağlanılamadı. npm run dev çalışıyor mu?', 'error');
+                }
             }
 
             tabBtns.forEach(btn => {
@@ -377,37 +354,36 @@
             searchInput.addEventListener('input', filterTable);
 
             const detailModal = document.getElementById('accountDetailModal');
-            const detailBtns = document.querySelectorAll('.btn-account-detail');
             const closeDetailModal = document.getElementById('closeDetailModal');
             const closeDetailBtn = document.getElementById('closeDetailBtn');
 
-            detailBtns.forEach(btn => {
-                btn.addEventListener('click', function () {
-                    document.getElementById('m-account-name').innerText = this.getAttribute('data-name');
-                    document.getElementById('m-account-role').innerText = this.getAttribute('data-role');
-                    document.getElementById('m-account-vno').innerText = this.getAttribute('data-vno');
-                    document.getElementById('m-account-phone').innerText = this.getAttribute('data-phone');
-                    document.getElementById('m-account-email').innerText = this.getAttribute('data-email');
-                    document.getElementById('m-account-balance').innerText = this.getAttribute('data-balance');
-                    const status = this.getAttribute('data-status') || '';
-                    const statusEl = document.getElementById('m-account-status');
-                    if (statusEl) {
-                        statusEl.textContent = status;
-                        statusEl.className = 'badge ' + (status === 'Alacak' ? 'credit' : status === 'Borç' ? 'debit' : 'balanced');
-                    }
-                    document.getElementById('m-account-address').innerText = this.getAttribute('data-address');
-                    const invoiceLink = document.getElementById('btn-invoice-for-account');
-                    if (invoiceLink) invoiceLink.href = 'invoice-new.html?cari=' + encodeURIComponent(this.getAttribute('data-name'));
+            tbody.addEventListener('click', function (e) {
+                const btn = e.target.closest('.btn-account-detail');
+                if (!btn) return;
+                document.getElementById('m-account-name').innerText = btn.getAttribute('data-name');
+                document.getElementById('m-account-role').innerText = btn.getAttribute('data-role');
+                document.getElementById('m-account-vno').innerText = btn.getAttribute('data-vno');
+                document.getElementById('m-account-phone').innerText = btn.getAttribute('data-phone');
+                document.getElementById('m-account-email').innerText = btn.getAttribute('data-email');
+                document.getElementById('m-account-balance').innerText = btn.getAttribute('data-balance');
+                const status = btn.getAttribute('data-status') || '';
+                const statusEl = document.getElementById('m-account-status');
+                if (statusEl) {
+                    statusEl.textContent = status;
+                    statusEl.className = 'badge ' + (status === 'Alacak' ? 'credit' : status === 'Borç' ? 'debit' : 'balanced');
+                }
+                document.getElementById('m-account-address').innerText = '-';
+                const invoiceLink = document.getElementById('btn-invoice-for-account');
+                if (invoiceLink) invoiceLink.href = 'invoice-new.html?cari=' + encodeURIComponent(btn.getAttribute('data-name'));
 
-                    detailModal.classList.add('active');
-                });
+                detailModal.classList.add('active');
             });
 
             function hideDetailModal() { detailModal.classList.remove('active'); }
             if (closeDetailModal) closeDetailModal.addEventListener('click', hideDetailModal);
             if (closeDetailBtn) closeDetailBtn.addEventListener('click', hideDetailModal);
 
-     
+
             const newModal = document.getElementById('newAccountModal');
             const btnOpenNew = document.getElementById('btn-open-new');
             const closeNewModal = document.getElementById('closeNewModal');
@@ -417,20 +393,57 @@
             if (btnOpenNew) {
                 btnOpenNew.addEventListener('click', () => newModal.classList.add('active'));
             }
+            document.getElementById('btn-empty-new-account')?.addEventListener('click', () => newModal.classList.add('active'));
             function hideNewModal() { newModal.classList.remove('active'); }
             if (closeNewModal) closeNewModal.addEventListener('click', hideNewModal);
             if (closeNewBtn) closeNewBtn.addEventListener('click', hideNewModal);
 
-            formNewAccount.addEventListener('submit', function (e) {
+            formNewAccount.addEventListener('submit', async function (e) {
                 e.preventDefault();
-                showToast('Yeni cari hesap kaydedildi');
-                hideNewModal();
-                formNewAccount.reset();
+                const payload = {
+                    cari_adi: document.getElementById('new-name').value.trim(),
+                    turu: document.getElementById('new-role').value,
+                    vergi_no: document.getElementById('new-vno').value.trim() || null,
+                    telefon: document.getElementById('new-phone').value.trim() || null,
+                    email: document.getElementById('new-email').value.trim() || null,
+                };
+                if (!payload.cari_adi) {
+                    showToast('Cari / Firma adı zorunlu', 'error');
+                    return;
+                }
+                const submitBtn = formNewAccount.querySelector('button[type="submit"]');
+                if (submitBtn) submitBtn.disabled = true;
+                try {
+                    const res = await authFetch('/api/accounts', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify(payload),
+                    });
+                    if (res.status === 401) {
+                        window.location.href = 'login.html';
+                        return;
+                    }
+                    const data = await res.json();
+                    if (!res.ok) {
+                        showToast(data.error || 'Cari oluşturulamadı', 'error');
+                        return;
+                    }
+                    showToast('Yeni cari hesap kaydedildi');
+                    hideNewModal();
+                    formNewAccount.reset();
+                    await loadAccounts();
+                } catch {
+                    showToast('Sunucuya bağlanılamadı. npm run dev çalışıyor mu?', 'error');
+                } finally {
+                    if (submitBtn) submitBtn.disabled = false;
+                }
             });
             window.addEventListener('click', function (e) {
                 if (e.target === detailModal) hideDetailModal();
                 if (e.target === newModal) hideNewModal();
             });
+
+            await loadAccounts();
         });
     </script>
 </body>

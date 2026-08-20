@@ -67,6 +67,15 @@
 document.addEventListener("DOMContentLoaded", () => {
   const page = document.body.dataset.page;
 
+  const PROTECTED_PAGES = [
+    "dashboard", "accounts", "invoices", "invoice-new", "invoice-template",
+    "expenses", "expense-new", "reports", "settings", "accountant",
+  ];
+  if (PROTECTED_PAGES.includes(page) && !localStorage.getItem("token")) {
+    window.location.href = "login.html";
+    return;
+  }
+
   if (!document.querySelector(".sidebar-overlay")) {
     const overlay = document.createElement("div");
     overlay.className = "sidebar-overlay";
@@ -490,6 +499,13 @@ function clearSession() {
   } catch {}
 }
 
+function authFetch(url, options = {}) {
+  const token = localStorage.getItem("token");
+  const headers = { ...(options.headers || {}) };
+  if (token) headers.Authorization = "Bearer " + token;
+  return fetch(url, { ...options, headers });
+}
+
 function userInitial(name) {
   const ch = String(name || "N").trim().charAt(0);
   return ch ? ch.toLocaleUpperCase("tr-TR") : "N";
@@ -714,7 +730,11 @@ function startSpeechToText(inputEl, micBtn, onEnd) {
 
   recognition.onerror = (event) => {
     if (event.error === "not-allowed" || event.error === "service-not-allowed") {
-      showToast("Mikrofon izni reddedildi.", "error");
+      showToast("Mikrofon izni reddedildi. Tarayıcı site ayarlarından mikrofona izin verin.", "error");
+    } else if (event.error === "audio-capture") {
+      showToast("Mikrofon bulunamadı. Bilgisayarınızda bir mikrofon bağlı/seçili olduğundan ve Windows gizlilik ayarlarında tarayıcının mikrofon erişimine izin verildiğinden emin olun.", "error");
+    } else if (event.error === "network") {
+      showToast("Ses tanıma servisine ulaşılamadı. İnternet bağlantınızı kontrol edin.", "error");
     } else if (event.error !== "aborted" && event.error !== "no-speech") {
       showToast("Ses tanıma hatası: " + event.error, "error");
     }

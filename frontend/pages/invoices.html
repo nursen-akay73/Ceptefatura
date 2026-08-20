@@ -143,58 +143,7 @@
                                 <th>İŞLEM</th>
                             </tr>
                         </thead>
-                        <tbody id="invoice-table-body">
-                            <tr>
-                                <td>INV-2026-001</td>
-                                <td>ABC Teknoloji</td>
-                                <td>E-Fatura</td>
-                                <td>03.08.2026</td>
-                                <td>03.09.2026</td>
-                                <td class="money">₺12.500,00</td>
-                                <td><span class="badge success">Ödendi</span></td>
-                                <td><button class="text-btn btn-detail" data-no="INV-2026-001" data-cari="ABC Teknoloji" data-turu="E-Fatura" data-tarih="03.08.2026" data-tutar="₺12.500" data-durum="Ödendi">Detay</button></td>
-                            </tr>
-                            <tr>
-                                <td>INV-2026-002</td>
-                                <td>XYZ Danışmanlık</td>
-                                <td>E-Arşiv</td>
-                                <td>01.08.2026</td>
-                                <td>10.08.2026</td>
-                                <td class="money">₺8.750,00</td>
-                                <td><span class="badge warning">Bekliyor</span></td>
-                                <td><button class="text-btn btn-detail" data-no="INV-2026-002" data-cari="XYZ Danışmanlık" data-turu="E-Arşiv" data-tarih="01.08.2026" data-tutar="₺8.750" data-durum="Bekliyor">Detay</button></td>
-                            </tr>
-                            <tr>
-                                <td>INV-2026-003</td>
-                                <td>Beta Lojistik</td>
-                                <td>E-Fatura</td>
-                                <td>28.07.2026</td>
-                                <td>28.07.2026</td>
-                                <td class="money">₺5.400,00</td>
-                                <td><span class="badge danger">Gecikti</span></td>
-                                <td><button class="text-btn btn-detail" data-no="INV-2026-003" data-cari="Beta Lojistik" data-turu="E-Fatura" data-tarih="28.07.2026" data-tutar="₺5.400" data-durum="Gecikti">Detay</button></td>
-                            </tr>
-                            <tr>
-                                <td>INV-2026-004</td>
-                                <td>Delta Mimarlık</td>
-                                <td>E-Arşiv</td>
-                                <td>04.08.2026</td>
-                                <td>20.08.2026</td>
-                                <td class="money">₺14.200,00</td>
-                                <td><span class="badge warning">Bekliyor</span></td>
-                                <td><button class="text-btn btn-detail" data-no="INV-2026-004" data-cari="Delta Mimarlık" data-turu="E-Arşiv" data-tarih="04.08.2026" data-tutar="₺14.200" data-durum="Bekliyor">Detay</button></td>
-                            </tr>
-                            <tr>
-                                <td>INV-2026-005</td>
-                                <td>Zirve Enerji</td>
-                                <td>E-Fatura</td>
-                                <td>25.07.2026</td>
-                                <td>15.08.2026</td>
-                                <td class="money">₺22.000,00</td>
-                                <td><span class="badge success">Ödendi</span></td>
-                                <td><button class="text-btn btn-detail" data-no="INV-2026-005" data-cari="Zirve Enerji" data-turu="E-Fatura" data-tarih="25.07.2026" data-tutar="₺22.000" data-durum="Ödendi">Detay</button></td>
-                            </tr>
-                        </tbody>
+                        <tbody id="invoice-table-body"></tbody>
                     </table>
                 </div>
                 <div class="empty-state" data-empty-for="#invoice-table-body">
@@ -236,13 +185,7 @@
                             <th>Tutar</th>
                         </tr>
                     </thead>
-                    <tbody>
-                        <tr>
-                            <td>Yazılım & Danışmanlık Hizmeti</td>
-                            <td>1 Adet</td>
-                            <td>%20</td>
-                            <td id="m-kalem-tutar">₺12.500,00</td>
-                        </tr>
+                    <tbody id="m-kalemler-body">
                     </tbody>
                 </table>
 
@@ -261,64 +204,126 @@
 
     <script src="../assets/js/script.js"></script>
     <script>
-        document.addEventListener('DOMContentLoaded', function () {
-    
+        document.addEventListener('DOMContentLoaded', async function () {
+
             const searchInput = document.getElementById('filter-search');
             const statusSelect = document.getElementById('filter-status');
             const typeSelect = document.getElementById('filter-type');
-            const rows = document.querySelectorAll('#invoice-table-body tr');
+            const tbody = document.getElementById('invoice-table-body');
+            let allInvoices = [];
 
-            function filterInvoices() {
+            function formatMoneyTR(n) {
+                return '₺' + Number(n || 0).toLocaleString('tr-TR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+            }
+
+            function formatDateTR(iso) {
+                if (!iso) return '-';
+                const [y, m, d] = String(iso).slice(0, 10).split('-');
+                return `${d}.${m}.${y}`;
+            }
+
+            function badgeClass(durum) {
+                if (durum === 'Ödendi') return 'success';
+                if (durum === 'Gecikti') return 'danger';
+                return 'warning';
+            }
+
+            function renderInvoices(list) {
+                tbody.innerHTML = list.map(inv => `
+                    <tr>
+                        <td>${inv.fatura_no}</td>
+                        <td>${inv.cari}</td>
+                        <td>${inv.fatura_turu}</td>
+                        <td>${formatDateTR(inv.tarih)}</td>
+                        <td>${formatDateTR(inv.vade)}</td>
+                        <td class="money">${formatMoneyTR(inv.tutar)}</td>
+                        <td><span class="badge ${badgeClass(inv.durum)}">${inv.durum}</span></td>
+                        <td><button class="text-btn btn-detail" data-id="${inv.id}">Detay</button></td>
+                    </tr>
+                `).join('');
+                syncEmptyStates();
+            }
+
+            function applyFilters() {
                 const query = searchInput.value.toLowerCase().trim();
                 const selectedStatus = statusSelect.value;
                 const selectedType = typeSelect.value;
 
-                rows.forEach(row => {
-                    const no = row.cells[0].innerText.toLowerCase();
-                    const cari = row.cells[1].innerText.toLowerCase();
-                    const type = row.cells[2].innerText;
-                    const status = row.querySelector('.badge').innerText;
-
-                    const matchesSearch = no.includes(query) || cari.includes(query);
-                    const matchesStatus = (selectedStatus === 'Tüm Durumlar') || (status === selectedStatus);
-                    const matchesType = (selectedType === 'Tüm Türler') || (type === selectedType);
-
-                    if (matchesSearch && matchesStatus && matchesType) {
-                        row.style.display = '';
-                    } else {
-                        row.style.display = 'none';
-                    }
+                const filtered = allInvoices.filter(inv => {
+                    const matchesSearch = !query
+                        || inv.fatura_no.toLowerCase().includes(query)
+                        || inv.cari.toLowerCase().includes(query);
+                    const matchesStatus = (selectedStatus === 'Tüm Durumlar') || (inv.durum === selectedStatus);
+                    const matchesType = (selectedType === 'Tüm Türler') || (inv.fatura_turu === selectedType);
+                    return matchesSearch && matchesStatus && matchesType;
                 });
+                renderInvoices(filtered);
             }
 
-            searchInput.addEventListener('input', filterInvoices);
-            statusSelect.addEventListener('change', filterInvoices);
-            typeSelect.addEventListener('change', filterInvoices);
+            async function loadInvoices() {
+                try {
+                    const res = await authFetch('/api/invoices');
+                    if (res.status === 401) {
+                        window.location.href = 'login.html';
+                        return;
+                    }
+                    const data = await res.json();
+                    if (!res.ok) {
+                        showToast(data.error || 'Faturalar alınamadı', 'error');
+                        return;
+                    }
+                    allInvoices = data;
+                    applyFilters();
+                } catch {
+                    showToast('Sunucuya bağlanılamadı. npm run dev çalışıyor mu?', 'error');
+                }
+            }
+
+            searchInput.addEventListener('input', applyFilters);
+            statusSelect.addEventListener('change', applyFilters);
+            typeSelect.addEventListener('change', applyFilters);
 
             const modal = document.getElementById('invoiceModal');
             const closeModal = document.getElementById('closeModal');
             const closeModalBtn = document.getElementById('closeModalBtn');
-            const detailBtns = document.querySelectorAll('.btn-detail');
+            const kalemlerBody = document.getElementById('m-kalemler-body');
 
-            detailBtns.forEach(btn => {
-                btn.addEventListener('click', function () {
-                    const no = this.getAttribute('data-no');
-                    const cari = this.getAttribute('data-cari');
-                    const turu = this.getAttribute('data-turu');
-                    const tarih = this.getAttribute('data-tarih');
-                    const tutar = this.getAttribute('data-tutar');
-                    const durum = this.getAttribute('data-durum');
+            tbody.addEventListener('click', async function (e) {
+                const btn = e.target.closest('.btn-detail');
+                if (!btn) return;
+                const id = btn.getAttribute('data-id');
+                try {
+                    const res = await authFetch(`/api/invoices/${id}`);
+                    if (res.status === 401) {
+                        window.location.href = 'login.html';
+                        return;
+                    }
+                    const inv = await res.json();
+                    if (!res.ok) {
+                        showToast(inv.error || 'Fatura detayı alınamadı', 'error');
+                        return;
+                    }
 
-                    document.getElementById('m-fatura-no').innerText = no;
-                    document.getElementById('m-fatura-turu').innerText = turu;
-                    document.getElementById('m-cari').innerText = cari;
-                    document.getElementById('m-tarih').innerText = tarih;
-                    document.getElementById('m-durum').innerText = durum;
-                    document.getElementById('m-kalem-tutar').innerText = tutar;
-                    document.getElementById('m-toplam').innerText = tutar;
+                    document.getElementById('m-fatura-no').innerText = inv.fatura_no;
+                    document.getElementById('m-fatura-turu').innerText = inv.fatura_turu;
+                    document.getElementById('m-cari').innerText = inv.cari_adi;
+                    document.getElementById('m-tarih').innerText = formatDateTR(inv.kesim_tarihi);
+                    document.getElementById('m-durum').innerText = inv.durum;
+                    document.getElementById('m-toplam').innerText = formatMoneyTR(inv.tutar);
+
+                    kalemlerBody.innerHTML = (inv.kalemler || []).map(k => `
+                        <tr>
+                            <td>${k.aciklama}</td>
+                            <td>${Number(k.miktar)} Adet</td>
+                            <td>%${Number(k.kdv_orani)}</td>
+                            <td>${formatMoneyTR(k.tutar)}</td>
+                        </tr>
+                    `).join('');
 
                     modal.classList.add('active');
-                });
+                } catch {
+                    showToast('Sunucuya bağlanılamadı. npm run dev çalışıyor mu?', 'error');
+                }
             });
 
             function hideModal() {
@@ -330,6 +335,8 @@
             modal.addEventListener('click', function (e) {
                 if (e.target === modal) hideModal();
             });
+
+            await loadInvoices();
         });
     </script>
 </body>

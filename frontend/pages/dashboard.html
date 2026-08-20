@@ -5,15 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Dashboard | Akıllı Muhasebe</title>
     <link rel="stylesheet" href="../assets/css/style.css">
-    <style>
-        .chart-12-months {
-            gap: 8px !important;
-        }
-
-            .chart-12-months .bar span {
-                font-size: 9px !important;
-            }
-    </style>
+    <link rel="icon" href="../assets/img/logo-icon.png">
 </head>
 <body data-page="dashboard">
     <div id="sidebar-container"></div>
@@ -52,24 +44,66 @@
             <br>
 
             <div class="grid two-col">
-                <div class="card">
+                <div class="card cashflow-card">
                     <div class="card-header">
-                        <h2>Gelir / Gider Özeti (Yıllık 12 Ay)</h2>
+                        <h2>Aylık gelir ve gider</h2>
                         <a class="link" href="reports.html">Detaylı Rapor</a>
                     </div>
-                    <div class="chart chart-12-months">
-                        <div class="bar" style="height:42%"><span>Oca</span></div>
-                        <div class="bar" style="height:58%"><span>Şub</span></div>
-                        <div class="bar" style="height:48%"><span>Mar</span></div>
-                        <div class="bar" style="height:72%"><span>Nis</span></div>
-                        <div class="bar" style="height:64%"><span>May</span></div>
-                        <div class="bar" style="height:86%"><span>Haz</span></div>
-                        <div class="bar" style="height:70%"><span>Tem</span></div>
-                        <div class="bar" style="height:60%"><span>Ağu</span></div>
-                        <div class="bar" style="height:68%"><span>Eyl</span></div>
-                        <div class="bar" style="height:75%"><span>Eki</span></div>
-                        <div class="bar" style="height:80%"><span>Kas</span></div>
-                        <div class="bar" style="height:85%"><span>Ara</span></div>
+                    <p class="cashflow-readout" data-cf-readout>Ağustos 2026 · Gelir ₺85.000 · Gider ₺32.000 · Net ₺53.000</p>
+                    <div class="cashflow" data-cashflow>
+                        <button type="button" class="cashflow-col" data-month="01" data-label="Ocak" data-gelir="48000" data-gider="31000">
+                            <span class="cashflow-bars"><span class="cashflow-bar gelir" style="--h:53%;--i:0"></span><span class="cashflow-bar gider" style="--h:34%;--i:0"></span></span>
+                            <span class="cashflow-label">Oca</span>
+                        </button>
+                        <button type="button" class="cashflow-col" data-month="02" data-label="Şubat" data-gelir="55000" data-gider="29000">
+                            <span class="cashflow-bars"><span class="cashflow-bar gelir" style="--h:61%;--i:1"></span><span class="cashflow-bar gider" style="--h:32%;--i:1"></span></span>
+                            <span class="cashflow-label">Şub</span>
+                        </button>
+                        <button type="button" class="cashflow-col" data-month="03" data-label="Mart" data-gelir="52000" data-gider="34000">
+                            <span class="cashflow-bars"><span class="cashflow-bar gelir" style="--h:58%;--i:2"></span><span class="cashflow-bar gider" style="--h:38%;--i:2"></span></span>
+                            <span class="cashflow-label">Mar</span>
+                        </button>
+                        <button type="button" class="cashflow-col" data-month="04" data-label="Nisan" data-gelir="68000" data-gider="36000">
+                            <span class="cashflow-bars"><span class="cashflow-bar gelir" style="--h:76%;--i:3"></span><span class="cashflow-bar gider" style="--h:40%;--i:3"></span></span>
+                            <span class="cashflow-label">Nis</span>
+                        </button>
+                        <button type="button" class="cashflow-col" data-month="05" data-label="Mayıs" data-gelir="61000" data-gider="33000">
+                            <span class="cashflow-bars"><span class="cashflow-bar gelir" style="--h:68%;--i:4"></span><span class="cashflow-bar gider" style="--h:37%;--i:4"></span></span>
+                            <span class="cashflow-label">May</span>
+                        </button>
+                        <button type="button" class="cashflow-col" data-month="06" data-label="Haziran" data-gelir="78000" data-gider="41000">
+                            <span class="cashflow-bars"><span class="cashflow-bar gelir" style="--h:87%;--i:5"></span><span class="cashflow-bar gider" style="--h:46%;--i:5"></span></span>
+                            <span class="cashflow-label">Haz</span>
+                        </button>
+                        <button type="button" class="cashflow-col" data-month="07" data-label="Temmuz" data-gelir="72000" data-gider="38000">
+                            <span class="cashflow-bars"><span class="cashflow-bar gelir" style="--h:80%;--i:6"></span><span class="cashflow-bar gider" style="--h:42%;--i:6"></span></span>
+                            <span class="cashflow-label">Tem</span>
+                        </button>
+                        <button type="button" class="cashflow-col is-current" data-month="08" data-label="Ağustos" data-gelir="85000" data-gider="32000">
+                            <span class="cashflow-bars"><span class="cashflow-bar gelir" style="--h:94%;--i:7"></span><span class="cashflow-bar gider" style="--h:36%;--i:7"></span></span>
+                            <span class="cashflow-label">Ağu</span>
+                        </button>
+                        <button type="button" class="cashflow-col" data-month="09" data-label="Eylül" data-gelir="64000" data-gider="35000">
+                            <span class="cashflow-bars"><span class="cashflow-bar gelir" style="--h:71%;--i:8"></span><span class="cashflow-bar gider" style="--h:39%;--i:8"></span></span>
+                            <span class="cashflow-label">Eyl</span>
+                        </button>
+                        <button type="button" class="cashflow-col" data-month="10" data-label="Ekim" data-gelir="70000" data-gider="37000">
+                            <span class="cashflow-bars"><span class="cashflow-bar gelir" style="--h:78%;--i:9"></span><span class="cashflow-bar gider" style="--h:41%;--i:9"></span></span>
+                            <span class="cashflow-label">Eki</span>
+                        </button>
+                        <button type="button" class="cashflow-col" data-month="11" data-label="Kasım" data-gelir="74000" data-gider="39000">
+                            <span class="cashflow-bars"><span class="cashflow-bar gelir" style="--h:82%;--i:10"></span><span class="cashflow-bar gider" style="--h:43%;--i:10"></span></span>
+                            <span class="cashflow-label">Kas</span>
+                        </button>
+                        <button type="button" class="cashflow-col" data-month="12" data-label="Aralık" data-gelir="80000" data-gider="42000">
+                            <span class="cashflow-bars"><span class="cashflow-bar gelir" style="--h:89%;--i:11"></span><span class="cashflow-bar gider" style="--h:47%;--i:11"></span></span>
+                            <span class="cashflow-label">Ara</span>
+                        </button>
+                    </div>
+                    <div class="cashflow-legend">
+                        <span><i class="gelir"></i> Gelir</span>
+                        <span><i class="gider"></i> Gider</span>
+                        <span class="muted">Aya tıklayınca rapor açılır</span>
                     </div>
                 </div>
 

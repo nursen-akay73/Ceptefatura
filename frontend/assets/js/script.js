@@ -1,13 +1,18 @@
 (function bootSplash() {
-  const logoSrc = document.currentScript
-    ? new URL("../img/logo.png", document.currentScript.src).href
-    : "../assets/img/logo.png";
+  const scriptSrc = document.currentScript ? document.currentScript.src : "";
+  const iconSrc = scriptSrc
+    ? new URL("../img/logo-icon.png", scriptSrc).href
+    : "../assets/img/logo-icon.png";
+  const wordSrc = scriptSrc
+    ? new URL("../img/logo-word.png", scriptSrc).href
+    : "../assets/img/logo-word.png";
 
   function splashMarkup() {
     return `
       <div class="splash-inner">
         <div class="splash-logo-wrap">
-          <img class="splash-logo" src="${logoSrc}" alt="CepteFatura">
+          <img class="splash-icon" src="${iconSrc}" alt="">
+          <img class="splash-word" src="${wordSrc}" alt="CepteFatura">
         </div>
         <div class="splash-skeleton">
           <div class="sk-line"></div>
@@ -34,7 +39,7 @@
     setTimeout(() => {
       el.classList.add("is-done");
       setTimeout(() => el.remove(), 450);
-    }, 1100);
+    }, 1250);
     try { sessionStorage.setItem("cf_splash", "1"); } catch {}
   }
 
@@ -100,6 +105,12 @@ document.addEventListener("DOMContentLoaded", () => {
           document.body.classList.toggle("nav-open");
         });
         applyCompanyContext();
+        applyUserMenu();
+        document.getElementById("logout-link")?.addEventListener("click", (e) => {
+          e.preventDefault();
+          clearSession();
+          window.location.href = "login.html";
+        });
       }
     });
 
@@ -176,6 +187,7 @@ document.addEventListener("DOMContentLoaded", () => {
           return;
         }
         if (data.token) localStorage.setItem("token", data.token);
+        if (data.user) saveSessionUser(data.user);
         if (mode === "login") {
           try {
             if (remember?.checked && body.email) localStorage.setItem("cf_email", body.email);
@@ -380,7 +392,43 @@ document.addEventListener("DOMContentLoaded", () => {
   }
 
   syncEmptyStates();
+
+  if (page === "dashboard") initCashflowChart();
+  if (page === "settings") initSettingsPage();
 });
+
+function initCashflowChart() {
+  const chart = document.querySelector("[data-cashflow]");
+  const readout = document.querySelector("[data-cf-readout]");
+  if (!chart || !readout) return;
+
+  const money = (n) => "₺" + Number(n).toLocaleString("tr-TR");
+
+  function show(col) {
+    if (!col) return;
+    chart.querySelectorAll(".cashflow-col").forEach((el) => {
+      el.classList.toggle("is-active", el === col);
+    });
+    const gelir = Number(col.dataset.gelir) || 0;
+    const gider = Number(col.dataset.gider) || 0;
+    const net = gelir - gider;
+    readout.textContent = col.dataset.label + " 2026 · Gelir " + money(gelir)
+      + " · Gider " + money(gider) + " · Net " + money(net);
+  }
+
+  const current = chart.querySelector(".cashflow-col.is-current") || chart.querySelector(".cashflow-col");
+  show(current);
+
+  chart.querySelectorAll(".cashflow-col").forEach((col) => {
+    col.addEventListener("mouseenter", () => show(col));
+    col.addEventListener("focus", () => show(col));
+    col.addEventListener("click", () => {
+      const month = col.dataset.month;
+      window.location.href = month ? "reports.html?period=" + month : "reports.html";
+    });
+  });
+  chart.addEventListener("mouseleave", () => show(current));
+}
 
 function labelTableCells() {
   document.querySelectorAll("table.table-cards").forEach((table) => {
@@ -411,6 +459,141 @@ function syncEmptyStates() {
       empty.classList.remove("visible");
       wrap?.classList.remove("is-empty");
     }
+  });
+}
+
+function getSessionUser() {
+  try {
+    const raw = localStorage.getItem("cf_user");
+    if (raw) return JSON.parse(raw);
+  } catch {}
+  return null;
+}
+
+function saveSessionUser(user) {
+  if (!user) return;
+  try {
+    localStorage.setItem("cf_user", JSON.stringify({
+      id: user.id,
+      ad_soyad: user.ad_soyad,
+      isletme_adi: user.isletme_adi,
+      email: user.email,
+    }));
+  } catch {}
+}
+
+function clearSession() {
+  try {
+    localStorage.removeItem("token");
+    localStorage.removeItem("cf_user");
+    sessionStorage.removeItem("cf_company");
+  } catch {}
+}
+
+function userInitial(name) {
+  const ch = String(name || "N").trim().charAt(0);
+  return ch ? ch.toLocaleUpperCase("tr-TR") : "N";
+}
+
+function paintUserMenu(user) {
+  const full = (user && user.ad_soyad) || "Nurşen";
+  const first = full.trim().split(/\s+/)[0] || "Nurşen";
+  const role = sessionStorage.getItem("cf_company") ? "Mali Müşavir" : "İşletme Yöneticisi";
+  const nameEl = document.getElementById("user-name");
+  const roleEl = document.getElementById("user-role");
+  const avatar = document.getElementById("user-avatar");
+  if (nameEl) nameEl.textContent = first;
+  if (roleEl) roleEl.textContent = role;
+  if (avatar) avatar.textContent = userInitial(first);
+  const sorumlu = document.getElementById("sorumlu-musavir");
+  if (sorumlu) sorumlu.value = full;
+}
+
+async function applyUserMenu() {
+  let user = getSessionUser();
+  paintUserMenu(user);
+  const token = localStorage.getItem("token");
+  if (!token) return;
+  try {
+    const res = await fetch("/api/auth/me", {
+      headers: { Authorization: "Bearer " + token },
+    });
+    if (!res.ok) return;
+    const data = await res.json();
+    if (data && data.ad_soyad) {
+      saveSessionUser(data);
+      paintUserMenu(data);
+      fillSettingsUser(data);
+    }
+  } catch {}
+}
+
+function fillSettingsUser(user) {
+  if (!user || document.body.dataset.page !== "settings") return;
+  const name = document.getElementById("set-ad-soyad");
+  const email = document.getElementById("set-email");
+  const company = document.getElementById("set-isletme");
+  const mailFirma = document.getElementById("set-firma-email");
+  if (name && !name.dataset.dirty) name.value = user.ad_soyad || "";
+  if (email && !email.dataset.dirty) email.value = user.email || "";
+  if (company && !company.dataset.dirty) company.value = user.isletme_adi || company.value;
+  if (mailFirma && user.email && mailFirma.value === "info@ceptefatura.com") {
+    mailFirma.value = user.email;
+  }
+}
+
+function initSettingsPage() {
+  const user = getSessionUser();
+  fillSettingsUser(user);
+
+  const hash = (location.hash || "").replace("#", "");
+  if (hash) {
+    const tab = document.querySelector(`[data-tabs] [data-tab="${hash}"]`);
+    tab?.click();
+  }
+
+  document.getElementById("form-account")?.addEventListener("submit", (e) => {
+    e.preventDefault();
+    const ad = document.getElementById("set-ad-soyad")?.value.trim();
+    const mail = document.getElementById("set-email")?.value.trim();
+    const pass = document.getElementById("set-sifre")?.value;
+    const pass2 = document.getElementById("set-sifre-tekrar")?.value;
+    if (pass || pass2) {
+      if (pass.length < 6) {
+        showToast("Şifre en az 6 karakter olmalı", "error");
+        return;
+      }
+      if (pass !== pass2) {
+        showToast("Şifreler eşleşmiyor", "error");
+        return;
+      }
+    }
+    const current = getSessionUser() || {};
+    saveSessionUser({ ...current, ad_soyad: ad, email: mail });
+    paintUserMenu(getSessionUser());
+    showToast("Hesap bilgileri kaydedildi");
+    document.getElementById("set-sifre").value = "";
+    document.getElementById("set-sifre-tekrar").value = "";
+  });
+
+  document.getElementById("form-notify")?.addEventListener("submit", (e) => {
+    e.preventDefault();
+    showToast("Bildirim tercihleri kaydedildi");
+  });
+
+  document.getElementById("btn-invite-accountant")?.addEventListener("click", () => {
+    const mail = document.getElementById("set-invite-email")?.value.trim();
+    if (!mail) {
+      showToast("Müşavir e-postasını yazın", "error");
+      return;
+    }
+    showToast("Davet e-postası gönderildi");
+  });
+
+  ["set-ad-soyad", "set-email", "set-isletme"].forEach((id) => {
+    document.getElementById(id)?.addEventListener("input", (e) => {
+      e.target.dataset.dirty = "1";
+    });
   });
 }
 

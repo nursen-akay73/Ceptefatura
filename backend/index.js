@@ -9,6 +9,7 @@ const invoices = require("./routes/invoices");
 const accounts = require("./routes/accounts");
 const expenses = require("./routes/expenses");
 const { UPLOAD_DIR } = require("./middleware/upload");
+const { checkDbConnection, hasDatabaseUrl } = require("./db");
 
 const FRONTEND = path.join(__dirname, "..", "frontend");
 
@@ -19,8 +20,16 @@ app.use(cors());
 app.use(express.json());
 app.use("/uploads", express.static(UPLOAD_DIR));
 
-app.get("/api/health", (_req, res) => {
-  res.json({ ok: true });
+app.get("/api/health", async (_req, res) => {
+  const db = await checkDbConnection();
+  res.json({
+    ok: true,
+    db,
+    env: {
+      databaseConfigured: hasDatabaseUrl,
+      jwtConfigured: Boolean(process.env.JWT_SECRET),
+    },
+  });
 });
 
 app.use("/api/auth", auth);
@@ -34,4 +43,14 @@ app.get("/", (_req, res) => {
 });
 
 const PORT = process.env.PORT || 3000;
-app.listen(PORT, () => console.log(`Uygulama http://localhost:${PORT}`));
+app.listen(PORT, async () => {
+  console.log(`Uygulama http://localhost:${PORT}`);
+
+  const db = await checkDbConnection();
+  if (db.ok) {
+    console.log("PostgreSQL bağlantısı başarılı.");
+  } else {
+    console.warn(`PostgreSQL bağlantısı kurulamadı: ${db.reason}`);
+    console.warn("Ekipte herkes backend/.env dosyasını kendi makinesinde oluşturmalı.");
+  }
+});

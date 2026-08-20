@@ -5,6 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Raporlar ve Analizler | Akıllı Muhasebe</title>
     <link rel="stylesheet" href="../assets/css/style.css">
+    <link rel="icon" href="../assets/img/logo-icon.png">
     <style>
         .chart-container {
             display: flex;
@@ -222,7 +223,11 @@
             periodSelect.addEventListener('change', updateDashboard);
             typeSelect.addEventListener('change', updateDashboard);
 
-       
+            const periodFromUrl = new URLSearchParams(window.location.search).get("period");
+            if (periodFromUrl && [...periodSelect.options].some((o) => o.value === periodFromUrl)) {
+                periodSelect.value = periodFromUrl;
+            }
+
             updateDashboard();
         });
     </script>

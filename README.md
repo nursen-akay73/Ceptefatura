@@ -34,20 +34,37 @@ database/schema.sql
 
 ## Çalıştırma
 
-Proje kökünden:
+İlk kurulumda her ekip üyesi kendi makinesinde `.env` oluşturmalı. Bu dosya Git'e girmez.
+
+1. Bağımlılıkları kur:
 
 ```bash
 cd backend
+npm install
 cp .env.example .env
 ```
 
-`.env` içine Neon `DATABASE_URL` ve bir `JWT_SECRET` yaz. İlk seferde `cd backend && npm install`.
+2. `backend/.env` içine şunları yaz:
 
-Sonra kök klasörde:
+- `DATABASE_URL` = Neon PostgreSQL connection string
+- `JWT_SECRET` = herhangi bir gizli anahtar
+- `PORT=3000`
+
+3. Proje kökünden çalıştır:
 
 ```bash
 npm run dev
 ```
 
-API: http://localhost:3000/api/health  
-Site: http://localhost:3000
+4. Kontrol et:
+
+- API sağlık: `http://localhost:3000/api/health`
+- Site: `http://localhost:3000`
+
+`/api/health` içinde `db.ok: true` görünmüyorsa sorun genelde şunlardan biridir:
+
+- `backend/.env` hiç oluşturulmadı
+- `DATABASE_URL` boş / yanlış yapıştırıldı
+- Neon tarafında erişim veya bağlantı sorunu var
+
+Not: `backend/.env` dosyası `.gitignore` içinde olduğu için diğer ekip üyeleri `git pull` ile bu dosyayı alamaz. Herkesin kendi `.env` dosyasını elle oluşturması gerekir.

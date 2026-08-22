@@ -1,0 +1,310 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Gelen Faturalar | Akıllı Muhasebe</title>
+    <link rel="stylesheet" href="../assets/css/style.css">
+    <link rel="icon" href="../assets/img/logo-icon.png">
+    <style>
+
+        .modal-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: rgba(15, 23, 42, 0.5);
+            backdrop-filter: blur(4px);
+            display: none;
+            align-items: center;
+            justify-content: center;
+            z-index: 9999;
+        }
+
+            .modal-overlay.active {
+                display: flex;
+            }
+
+        .modal-card {
+            background: #fff;
+            border-radius: 12px;
+            width: 90%;
+            max-width: 600px;
+            padding: 24px;
+            box-shadow: 0 20px 25px -5px rgba(0,0,0,0.1);
+            animation: modalIn 0.2s ease-out;
+        }
+
+        @keyframes modalIn {
+            from {
+                opacity: 0;
+                transform: scale(0.95);
+            }
+
+            to {
+                opacity: 1;
+                transform: scale(1);
+            }
+        }
+
+        .modal-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            border-bottom: 1px solid #f1f5f9;
+            padding-bottom: 12px;
+            margin-bottom: 16px;
+        }
+
+        .modal-close {
+            background: none;
+            border: none;
+            font-size: 24px;
+            cursor: pointer;
+            color: var(--muted);
+        }
+
+        .invoice-preview-table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 12px;
+            font-size: 13px;
+        }
+
+            .invoice-preview-table th, .invoice-preview-table td {
+                padding: 8px 12px;
+                border-bottom: 1px solid #f1f5f9;
+                text-align: left;
+            }
+
+        .invoice-summary {
+            margin-top: 16px;
+            display: flex;
+            flex-direction: column;
+            align-items: flex-end;
+            gap: 6px;
+            font-size: 13px;
+        }
+
+        .no-result-row {
+            text-align: center;
+            color: var(--muted);
+            padding: 20px;
+            font-weight: 500;
+        }
+    </style>
+</head>
+<body data-page="incoming-invoices">
+    <div id="sidebar-container"></div>
+    <div class="main">
+        <div id="header-container"></div>
+        <main class="content">
+
+            <div class="page-heading">
+                <div>
+                    <h1>Gelen Faturalar</h1>
+                    <p>Vergi numaranız adına başka işletmelerin kestiği faturalar.</p>
+                </div>
+                <div style="display:flex; gap:10px;">
+                    <a class="btn btn-secondary" href="dashboard.html"> Ana Sayfa</a>
+                    <a class="btn btn-secondary" href="invoices.html"> Kestiğim Faturalar</a>
+                </div>
+            </div>
+
+            <div class="card">
+
+                <div class="filter-row">
+                    <input type="search" id="filter-search" placeholder="Fatura no veya gönderen firma ara...">
+                    <select id="filter-status">
+                        <option value="Tüm Durumlar">Tüm Durumlar</option>
+                        <option value="Ödendi">Ödendi</option>
+                        <option value="Bekliyor">Bekliyor</option>
+                        <option value="Gecikti">Gecikti</option>
+                    </select>
+                    <select id="filter-type">
+                        <option value="Tüm Türler">Tüm Türler</option>
+                        <option value="E-Fatura">E-Fatura</option>
+                        <option value="E-Arşiv">E-Arşiv</option>
+                    </select>
+                </div>
+
+                <div class="table-wrap">
+                    <table class="table table-cards">
+                        <thead>
+                            <tr>
+                                <th>FATURA NO</th>
+                                <th>GÖNDEREN FİRMA</th>
+                                <th>FATURA TÜRÜ</th>
+                                <th>TARİH</th>
+                                <th>VADE</th>
+                                <th class="money">TUTAR</th>
+                                <th>DURUM</th>
+                                <th>İŞLEM</th>
+                            </tr>
+                        </thead>
+                        <tbody id="invoice-table-body"></tbody>
+                    </table>
+                </div>
+                <div class="empty-state" data-empty-for="#invoice-table-body">
+                    <div class="empty-icon">▤</div>
+                    <p data-empty-none>Henüz size kesilmiş bir fatura yok. Bir işletme, cari kaydına vergi numaranızı girip fatura kestiğinde burada görünür.</p>
+                    <p data-empty-filter hidden>Aramanıza uygun fatura bulunamadı.</p>
+                </div>
+            </div>
+
+        </main>
+    </div>
+
+
+    <div class="modal-overlay drawer" id="invoiceModal">
+        <div class="modal-card">
+            <div class="modal-header">
+                <div>
+                    <h2 id="m-fatura-no" style="font-size:18px; margin:0; color:var(--text);">INV-2026-001</h2>
+                    <span id="m-fatura-turu" class="badge" style="margin-top:4px; display:inline-block;">E-Fatura</span>
+                </div>
+                <button class="modal-close" id="closeModal">&times;</button>
+            </div>
+            <div class="modal-body">
+                <div style="display:grid; grid-template-columns:1fr 1fr; gap:12px; margin-bottom:16px; font-size:13px;">
+                    <div><strong>Gönderen Firma:</strong> <span id="m-cari">—</span></div>
+                    <div><strong>Kesim Tarihi:</strong> <span id="m-tarih">—</span></div>
+                    <div><strong>Durum:</strong> <span id="m-durum">—</span></div>
+                    <div><strong>Vade Tarihi:</strong> <span id="m-vade">—</span></div>
+                </div>
+
+                <table class="invoice-preview-table">
+                    <thead>
+                        <tr style="background:#f8fafc;">
+                            <th>Hizmet / Ürün</th>
+                            <th>Miktar</th>
+                            <th>KDV</th>
+                            <th>Tutar</th>
+                        </tr>
+                    </thead>
+                    <tbody id="m-kalemler"></tbody>
+                </table>
+
+                <div class="invoice-summary">
+                    <div style="font-size:15px; font-weight:bold; color:var(--primary); margin-top:8px;">
+                        Genel Toplam: <span id="m-toplam">—</span>
+                    </div>
+                </div>
+            </div>
+            <div style="display:flex; justify-content:flex-end; gap:10px; margin-top:20px; border-top:1px solid #f1f5f9; padding-top:12px;">
+                <button class="btn btn-secondary" id="closeModalBtn">Kapat</button>
+                <button class="btn btn-primary" type="button" id="btn-pdf-invoice">PDF İndir</button>
+            </div>
+        </div>
+    </div>
+
+    <script src="../assets/js/script.js"></script>
+    <script>
+        document.addEventListener('DOMContentLoaded', function () {
+
+            const searchInput = document.getElementById('filter-search');
+            const statusSelect = document.getElementById('filter-status');
+            const typeSelect = document.getElementById('filter-type');
+            const tableBody = document.getElementById('invoice-table-body');
+            const money = (n) => '₺' + Number(n || 0).toLocaleString('tr-TR', { minimumFractionDigits: 2 });
+            const dateTr = (d) => d ? new Date(d).toLocaleDateString('tr-TR') : '—';
+
+            function statusBadgeClass(durum) {
+                if (durum === 'Ödendi') return 'success';
+                if (durum === 'Gecikti') return 'danger';
+                return 'warning';
+            }
+
+            function renderRow(inv) {
+                const tr = document.createElement('tr');
+                tr.innerHTML = `
+            <td></td>
+            <td></td>
+            <td></td>
+            <td></td>
+            <td></td>
+            <td class="money"></td>
+            <td><span class="badge ${statusBadgeClass(inv.durum)}"></span></td>
+            <td><button class="text-btn btn-detail">Detay</button></td>
+          `;
+                tr.children[0].textContent = inv.fatura_no;
+                tr.children[1].textContent = inv.gonderen;
+                tr.children[2].textContent = inv.fatura_turu;
+                tr.children[3].textContent = dateTr(inv.tarih);
+                tr.children[4].textContent = dateTr(inv.vade);
+                tr.querySelector('.money').textContent = money(inv.tutar);
+                tr.querySelector('.badge').textContent = inv.durum;
+                tr.querySelector('.btn-detail').addEventListener('click', () => openDetail(inv.id));
+                return tr;
+            }
+
+            async function loadInvoices() {
+                const params = new URLSearchParams();
+                if (searchInput.value.trim()) params.set('search', searchInput.value.trim());
+                if (statusSelect.value !== 'Tüm Durumlar') params.set('status', statusSelect.value);
+                if (typeSelect.value !== 'Tüm Türler') params.set('type', typeSelect.value);
+
+                try {
+                    const list = await apiFetch('/api/invoices/received?' + params.toString());
+                    tableBody.innerHTML = '';
+                    list.forEach((inv) => tableBody.appendChild(renderRow(inv)));
+                    syncEmptyStates();
+                } catch (err) {
+                    showToast(err.message || 'Gelen faturalar alınamadı', 'error');
+                }
+            }
+
+            let debounce;
+            searchInput.addEventListener('input', () => { clearTimeout(debounce); debounce = setTimeout(loadInvoices, 300); });
+            statusSelect.addEventListener('change', loadInvoices);
+            typeSelect.addEventListener('change', loadInvoices);
+
+            const modal = document.getElementById('invoiceModal');
+            const closeModal = document.getElementById('closeModal');
+            const closeModalBtn = document.getElementById('closeModalBtn');
+
+            async function openDetail(id) {
+                try {
+                    const inv = await apiFetch('/api/invoices/' + id);
+                    document.getElementById('m-fatura-no').innerText = inv.fatura_no;
+                    document.getElementById('m-fatura-turu').innerText = inv.fatura_turu;
+                    document.getElementById('m-cari').innerText = inv.gonderen_isletme || inv.cari_adi;
+                    document.getElementById('m-tarih').innerText = dateTr(inv.kesim_tarihi);
+                    document.getElementById('m-vade').innerText = dateTr(inv.vade_tarihi);
+                    document.getElementById('m-durum').innerText = inv.durum;
+                    document.getElementById('m-toplam').innerText = money(inv.tutar);
+
+                    const kalemlerBody = document.getElementById('m-kalemler');
+                    kalemlerBody.innerHTML = '';
+                    (inv.kalemler || []).forEach((k) => {
+                        const tr = document.createElement('tr');
+                        tr.innerHTML = `<td></td><td></td><td></td><td></td>`;
+                        tr.children[0].textContent = k.aciklama;
+                        tr.children[1].textContent = k.miktar + ' Adet';
+                        tr.children[2].textContent = '%' + k.kdv_orani;
+                        tr.children[3].textContent = money(k.tutar);
+                        kalemlerBody.appendChild(tr);
+                    });
+
+                    modal.classList.add('active');
+                } catch (err) {
+                    showToast(err.message || 'Fatura detayı alınamadı', 'error');
+                }
+            }
+
+            function hideModal() {
+                modal.classList.remove('active');
+            }
+
+            if (closeModal) closeModal.addEventListener('click', hideModal);
+            if (closeModalBtn) closeModalBtn.addEventListener('click', hideModal);
+            modal.addEventListener('click', function (e) {
+                if (e.target === modal) hideModal();
+            });
+
+            loadInvoices();
+        });
+    </script>
+</body>
+</html>

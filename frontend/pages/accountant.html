@@ -112,10 +112,22 @@
             </div>
 
             <div class="grid stats">
-                <div class="card stat-card"><span class="label">Bağlı İşletme</span><div class="value" id="stat-company-count">12</div></div>
-                <div class="card stat-card"><span class="label">Onay Bekleyen Fişler</span><div class="value">18</div></div>
-                <div class="card stat-card"><span class="label">Bu Ay Tamamlanan</span><div class="value">146</div></div>
-                <div class="card stat-card"><span class="label">Yaklaşan Beyanname</span><div class="value">4</div></div>
+                <div class="card stat-card"><span class="label">Bağlı İşletme</span><div class="value" id="stat-company-count">0</div></div>
+            </div>
+            <br>
+
+            <div class="card" id="pending-requests-card" hidden>
+                <div class="card-header">
+                    <h2>Onay Bekleyen Bağlantı İstekleri</h2>
+                </div>
+                <div class="table-wrap">
+                    <table class="table table-cards">
+                        <thead>
+                            <tr><th>İŞLETME</th><th>İSTEYEN</th><th>İŞLEM</th></tr>
+                        </thead>
+                        <tbody id="pending-requests-body"></tbody>
+                    </table>
+                </div>
             </div>
             <br>
 
@@ -130,78 +142,17 @@
                             <tr>
                                 <th>İŞLETME</th>
                                 <th>VERGİ NO</th>
-                                <th>SON İŞLEM</th>
-                                <th>DÖNEM</th>
-                                <th>DURUM</th>
+                                <th>ROLÜNÜZ</th>
                                 <th>İŞLEM</th>
                             </tr>
                         </thead>
-                        <tbody id="company-table-body">
-                            <tr>
-                                <td><strong>ABC Teknoloji</strong></td>
-                                <td>1234567890</td>
-                                <td>03.08.2026</td>
-                                <td>Temmuz 2026</td>
-                                <td><span class="badge success">Aktif</span></td>
-                                <td>
-                                    <button class="text-btn btn-company-detail"
-                                            data-isletme="ABC Teknoloji"
-                                            data-vno="1234567890"
-                                            data-sonislem="03.08.2026"
-                                            data-donem="Temmuz 2026"
-                                            data-durum="Aktif"
-                                            data-bekleyen="3 Belge"
-                                            data-kdv="Hazırlandı ✓"
-                                            data-muhtasar="Onay Bekliyor">
-                                        Detay
-                                    </button>
-                                    <a class="btn btn-secondary btn-sm js-switch-company" href="dashboard.html">İşletmeye Geçiş Yap →</a>
-                                </td>
-                            </tr>
-                            <tr>
-                                <td><strong>XYZ Danışmanlık</strong></td>
-                                <td>9876543210</td>
-                                <td>02.08.2026</td>
-                                <td>Temmuz 2026</td>
-                                <td><span class="badge success">Aktif</span></td>
-                                <td>
-                                    <button class="text-btn btn-company-detail"
-                                            data-isletme="XYZ Danışmanlık"
-                                            data-vno="9876543210"
-                                            data-sonislem="02.08.2026"
-                                            data-donem="Temmuz 2026"
-                                            data-durum="Aktif"
-                                            data-bekleyen="7 Belge"
-                                            data-kdv="Eksik Evrak Var"
-                                            data-muhtasar="Hazırlandı ✓">
-                                        Detay
-                                    </button>
-                                    <a class="btn btn-secondary btn-sm js-switch-company" href="dashboard.html">İşletmeye Geçiş Yap →</a>
-                                </td>
-                            </tr>
-                            <tr>
-                                <td><strong>Beta Lojistik</strong></td>
-                                <td>4567890123</td>
-                                <td>30.07.2026</td>
-                                <td>Temmuz 2026</td>
-                                <td><span class="badge warning">Kontrol</span></td>
-                                <td>
-                                    <button class="text-btn btn-company-detail"
-   data-isletme="Beta Lojistik"
- data-vno="4567890123"
- data-sonislem="30.07.2026"
-  data-donem="Temmuz 2026"
- data-durum="Kontrol Bekliyor"
- data-bekleyen="8 Belge"
-  data-kdv="İnceleniyor"
-  data-muhtasar="Hazırlanmadı">
-                             Detay
-                                    </button>
-                                    <a class="btn btn-secondary btn-sm js-switch-company" href="dashboard.html">İşletmeye Geçiş Yap →</a>
-                                </td>
-                            </tr>
-                        </tbody>
+                        <tbody id="company-table-body"></tbody>
                     </table>
+                </div>
+                <div class="empty-state" data-empty-for="#company-table-body">
+                    <div class="empty-icon">▤</div>
+                    <p data-empty-none>Henüz bağlı işletme yok. İşletme Ekle ile ilk işletmenizi bağlayın.</p>
+                    <p data-empty-filter hidden>Aramanıza uygun işletme bulunamadı.</p>
                 </div>
             </div>
 
@@ -230,19 +181,9 @@
                             <input class="table-input" id="add-company-taxoffice" placeholder="Örn: Maslak VD">
                         </div>
                     </div>
-                    <div style="display:grid; grid-template-columns:1fr 1fr; gap:10px;">
-                        <div class="form-group">
-                            <label style="font-weight:600;">Çalışma Dönemi</label>
-                            <select class="table-input" id="add-company-period">
-                                <option>Ağustos 2026</option>
-                                <option>Temmuz 2026</option>
-                                <option>Haziran 2026</option>
-                            </select>
-                        </div>
-                        <div class="form-group">
-                            <label style="font-weight:600;">Sorumlu Müşavir</label>
-                            <input class="table-input" id="sorumlu-musavir" readonly style="background:#f8fafc;">
-                        </div>
+                    <div class="form-group">
+                        <label style="font-weight:600;">Sorumlu Müşavir</label>
+                        <input class="table-input" id="sorumlu-musavir" readonly style="background:#f8fafc;">
                     </div>
                 </div>
                 <div style="display:flex; justify-content:flex-end; gap:10px; margin-top:20px; border-top:1px solid #f1f5f9; padding-top:12px;">
@@ -253,76 +194,9 @@
         </div>
     </div>
 
-    <div class="modal-overlay drawer" id="companyModal">
-        <div class="modal-card">
-            <div class="modal-header">
-                <div>
-                    <h2 id="m-isletme-adi" style="font-size:18px; margin:0; color:var(--text);">ABC Teknoloji</h2>
-                    <span id="m-durum-badge" class="badge success" style="margin-top:4px; display:inline-block;">Aktif</span>
-                </div>
-                <button class="modal-close" id="closeModal">&times;</button>
-            </div>
-            <div class="modal-body">
-                <div class="detail-grid">
-                    <div><strong>Vergi Numarası:</strong> <br><span id="m-vno">1234567890</span></div>
-                    <div><strong>Cari Dönem:</strong> <br><span id="m-donem">Temmuz 2026</span></div>
-                    <div><strong>Son İşlem Tarihi:</strong> <br><span id="m-son-islem">03.08.2026</span></div>
-                    <div><strong>Bekleyen İşlem/Evrak:</strong> <br><span id="m-bekleyen" style="color:var(--warning); font-weight:bold;">3 Belge</span></div>
-                </div>
-
-                <h3 style="font-size:14px; margin-bottom:10px;">Dönem Beyanname Kontrolleri</h3>
-                <ul class="status-list">
-                    <li>
-                        <span>KDV-1 Beyannamesi</span>
-                        <strong id="m-kdv" style="color:var(--primary);">Hazırlandı ✓</strong>
-                    </li>
-                    <li>
-                        <span>Muhtasar ve Prim Hizmet</span>
-                        <strong id="m-muhtasar">Onay Bekliyor</strong>
-                    </li>
-                    <li>
-                        <span>Geçici Vergi Durumu</span>
-                        <strong style="color:var(--success);">Tamamlandı ✓</strong>
-                    </li>
-                </ul>
-            </div>
-            <div style="display:flex; justify-content:flex-end; gap:10px; margin-top:20px; border-top:1px solid #f1f5f9; padding-top:12px;">
-                <button class="btn btn-secondary" id="closeModalBtn">Kapat</button>
-                <a class="btn btn-primary js-switch-company" href="dashboard.html">İşletmeye Geçiş Yap →</a>
-            </div>
-        </div>
-    </div>
-
     <script src="../assets/js/script.js"></script>
     <script>
         document.addEventListener('DOMContentLoaded', function () {
-            const detailModal = document.getElementById('companyModal');
-            const closeDetailModal = document.getElementById('closeModal');
-            const closeDetailBtn = document.getElementById('closeModalBtn');
-
-            function attachDetailEvents() {
-                const detailBtns = document.querySelectorAll('.btn-company-detail');
-                detailBtns.forEach(btn => {
-                    btn.onclick = function () {
-                        document.getElementById('m-isletme-adi').innerText = this.getAttribute('data-isletme');
-                        document.getElementById('m-vno').innerText = this.getAttribute('data-vno');
-                        document.getElementById('m-son-islem').innerText = this.getAttribute('data-sonislem');
-                        document.getElementById('m-donem').innerText = this.getAttribute('data-donem');
-                        document.getElementById('m-durum-badge').innerText = this.getAttribute('data-durum');
-                        document.getElementById('m-bekleyen').innerText = this.getAttribute('data-bekleyen');
-                        document.getElementById('m-kdv').innerText = this.getAttribute('data-kdv');
-                        document.getElementById('m-muhtasar').innerText = this.getAttribute('data-muhtasar');
-
-                        detailModal.classList.add('active');
-                    };
-                });
-            }
-            attachDetailEvents();
-
-            function hideDetailModal() { detailModal.classList.remove('active'); }
-            if (closeDetailModal) closeDetailModal.addEventListener('click', hideDetailModal);
-            if (closeDetailBtn) closeDetailBtn.addEventListener('click', hideDetailModal);
-
             const addModal = document.getElementById('addCompanyModal');
             const btnOpenAdd = document.getElementById('btn-open-add-company');
             const closeAddModal = document.getElementById('closeAddModal');
@@ -330,73 +204,163 @@
             const formAddCompany = document.getElementById('form-add-company');
             const companyTableBody = document.getElementById('company-table-body');
             const statCompanyCount = document.getElementById('stat-company-count');
+            const searchInput = document.getElementById('search-company');
+
+            function renderRow(biz) {
+                const tr = document.createElement('tr');
+                tr.dataset.businessId = biz.id;
+                const pending = biz.status === 'beklemede';
+                const badgeClass = pending ? 'warning' : (biz.role === 'sahip' ? 'success' : 'info');
+                const badgeText = pending ? 'Onay Bekliyor' : (biz.role === 'sahip' ? 'Sahip' : 'Müşavir');
+                tr.innerHTML = `
+            <td><strong></strong></td>
+            <td></td>
+            <td><span class="badge ${badgeClass}"></span></td>
+            <td>
+              <div class="table-actions">
+                ${pending
+                    ? '<span class="muted" style="font-size:12px;">Sahip onayı bekleniyor</span>'
+                    : `<a class="btn btn-secondary btn-sm js-switch-company" data-business-id="${biz.id}" data-company="" href="dashboard.html">Geçiş Yap →</a>`}
+                <button type="button" class="icon-btn icon-btn-danger js-unlink-company" data-business-id="${biz.id}" aria-label="Bağlantıyı kaldır" title="Bağlantıyı kaldır">
+                  <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18"/><path d="M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6"/><path d="M10 11v6"/><path d="M14 11v6"/></svg>
+                </button>
+              </div>
+            </td>
+          `;
+                tr.querySelector('strong').textContent = biz.isletme_adi;
+                tr.children[1].textContent = biz.vergi_no || '—';
+                tr.querySelector('.badge').textContent = badgeText;
+                const switchLink = tr.querySelector('.js-switch-company');
+                if (switchLink) switchLink.dataset.company = biz.isletme_adi;
+                tr.querySelector('.js-unlink-company').dataset.company = biz.isletme_adi;
+                return tr;
+            }
+
+            async function loadBusinesses() {
+                try {
+                    const list = await apiFetch('/api/businesses');
+                    companyTableBody.innerHTML = '';
+                    list.forEach((biz) => companyTableBody.appendChild(renderRow(biz)));
+                    statCompanyCount.textContent = list.length;
+                    syncEmptyStates();
+                } catch (err) {
+                    showToast(err.message || 'İşletmeler alınamadı', 'error');
+                }
+            }
+            loadBusinesses();
+
+            const pendingCard = document.getElementById('pending-requests-card');
+            const pendingBody = document.getElementById('pending-requests-body');
+
+            function renderRequestRow(reqItem) {
+                const tr = document.createElement('tr');
+                tr.dataset.requestId = reqItem.id;
+                tr.innerHTML = `
+            <td><strong></strong></td>
+            <td></td>
+            <td>
+              <div class="table-actions">
+                <button type="button" class="btn btn-primary btn-sm js-approve-request">Onayla</button>
+                <button type="button" class="btn btn-secondary btn-sm js-reject-request">Reddet</button>
+              </div>
+            </td>
+          `;
+                tr.querySelector('strong').textContent = reqItem.isletme_adi;
+                tr.children[1].textContent = reqItem.ad_soyad + (reqItem.email ? ' · ' + reqItem.email : '');
+                return tr;
+            }
+
+            async function loadPendingRequests() {
+                try {
+                    const list = await apiFetch('/api/businesses/requests');
+                    pendingBody.innerHTML = '';
+                    list.forEach((r) => pendingBody.appendChild(renderRequestRow(r)));
+                    pendingCard.hidden = list.length === 0;
+                } catch {
+                    pendingCard.hidden = true;
+                }
+            }
+            loadPendingRequests();
+
+            pendingBody.addEventListener('click', async function (e) {
+                const approveBtn = e.target.closest('.js-approve-request');
+                const rejectBtn = e.target.closest('.js-reject-request');
+                if (!approveBtn && !rejectBtn) return;
+                const row = e.target.closest('tr');
+                const requestId = row?.dataset.requestId;
+                if (!requestId) return;
+                const action = approveBtn ? 'approve' : 'reject';
+                try {
+                    await apiFetch('/api/businesses/requests/' + requestId + '/' + action, { method: 'POST' });
+                    showToast(action === 'approve' ? 'Bağlantı onaylandı' : 'İstek reddedildi');
+                    row.remove();
+                    pendingCard.hidden = pendingBody.children.length === 0;
+                } catch (err) {
+                    showToast(err.message || 'İşlem başarısız', 'error');
+                }
+            });
 
             if (btnOpenAdd) {
                 btnOpenAdd.addEventListener('click', () => addModal.classList.add('active'));
             }
-
-            function hideAddModal() {
-                addModal.classList.remove('active');
-            }
-
+            function hideAddModal() { addModal.classList.remove('active'); }
             if (closeAddModal) closeAddModal.addEventListener('click', hideAddModal);
             if (closeAddBtn) closeAddBtn.addEventListener('click', hideAddModal);
 
-            formAddCompany.addEventListener('submit', function (e) {
+            formAddCompany.addEventListener('submit', async function (e) {
                 e.preventDefault();
+                const isletme_adi = document.getElementById('add-company-name').value.trim();
+                const vergi_no = document.getElementById('add-company-vno').value.trim();
+                const vergi_dairesi = document.getElementById('add-company-taxoffice').value.trim();
 
-                const name = document.getElementById('add-company-name').value.trim();
-                const vno = document.getElementById('add-company-vno').value.trim();
-                const period = document.getElementById('add-company-period').value;
-
-                const today = '10.08.2026';
-
-                const tr = document.createElement('tr');
-                tr.innerHTML = `
-            <td><strong>${name}</strong></td>
-            <td>${vno}</td>
-            <td>${today}</td>
-            <td>${period}</td>
-            <td><span class="badge success">Aktif</span></td>
-            <td>
-              <button class="text-btn btn-company-detail"
-                      data-isletme="${name}"
-                      data-vno="${vno}"
-                      data-sonislem="${today}"
-                      data-donem="${period}"
-                      data-durum="Aktif"
-                      data-bekleyen="0 Belge"
-                      data-kdv="Hazırlanıyor"
-                      data-muhtasar="Hazırlanıyor">
-                Detay
-              </button>
-              <a class="btn btn-secondary btn-sm js-switch-company" href="dashboard.html">İşletmeye Geçiş Yap →</a>
-            </td>
-          `;
-
-                companyTableBody.prepend(tr);
-
-                let count = parseInt(statCompanyCount.innerText) || 12;
-                statCompanyCount.innerText = count + 1;
-
-                attachDetailEvents();
-
-                showToast('"' + name + '" işletmesi bağlandı');
-                hideAddModal();
-                formAddCompany.reset();
+                try {
+                    const result = await apiFetch('/api/businesses', {
+                        method: 'POST',
+                        body: { isletme_adi, vergi_no, vergi_dairesi },
+                    });
+                    if (result.status === 'beklemede') {
+                        showToast('"' + isletme_adi + '" için bağlantı isteği gönderildi, işletme sahibinin onayını bekliyor');
+                    } else {
+                        showToast('"' + isletme_adi + '" işletmesi bağlandı');
+                    }
+                    hideAddModal();
+                    formAddCompany.reset();
+                    loadBusinesses();
+                } catch (err) {
+                    showToast(err.message || 'İşletme oluşturulamadı', 'error');
+                }
             });
 
-            const searchInput = document.getElementById('search-company');
             searchInput.addEventListener('input', function () {
                 const q = this.value.toLowerCase().trim();
-                const rows = companyTableBody.querySelectorAll('tr');
-                rows.forEach(row => {
+                companyTableBody.querySelectorAll('tr').forEach((row) => {
                     row.style.display = row.innerText.toLowerCase().includes(q) ? '' : 'none';
                 });
+                syncEmptyStates();
+            });
+
+            companyTableBody.addEventListener('click', async function (e) {
+                const btn = e.target.closest('.js-unlink-company');
+                if (!btn) return;
+                e.preventDefault();
+                const id = btn.dataset.businessId;
+                const name = btn.dataset.company || 'işletme';
+                if (!id) return;
+                if (!confirm('"' + name + '" bağlantısını kaldırmak istediğinize emin misiniz?')) return;
+                try {
+                    await apiFetch('/api/businesses/' + id, { method: 'DELETE' });
+                    if (typeof activeBusinessId === 'function' && activeBusinessId() === id) {
+                        setActiveBusinessId('');
+                        try { sessionStorage.removeItem('cf_company'); } catch {}
+                    }
+                    showToast('"' + name + '" bağlantısı kaldırıldı');
+                    loadBusinesses();
+                } catch (err) {
+                    showToast(err.message || 'Silinemedi', 'error');
+                }
             });
 
             window.addEventListener('click', function (e) {
-                if (e.target === detailModal) hideDetailModal();
                 if (e.target === addModal) hideAddModal();
             });
         });

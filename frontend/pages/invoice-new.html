@@ -29,44 +29,46 @@
                 <div style="display:flex; justify-content:space-between; align-items:center; gap:12px; flex-wrap:wrap;">
                     <div>
                         <h3 style="font-size:15px; margin:0 0 4px 0;">Görüntüden Otomatik Doldur</h3>
-                        <p style="margin:0; font-size:13px; color:var(--muted);">Bir fatura/fiş görüntüsü veya PDF yükleyin, alanlar otomatik doldurulsun.</p>
+                        <p style="margin:0; font-size:13px; color:var(--muted);">Fatura/fiş fotoğrafı yükleyin; alanlar forma dolar, kaydetmeden önce kontrol edin.</p>
                     </div>
                     <div style="display:flex; gap:10px;">
-                        <button type="button" class="btn btn-secondary" id="btn-scan-camera">📷 Kamerayı Aç</button>
-                        <button type="button" class="btn btn-secondary" id="btn-scan-upload">📁 Dosya Yükle</button>
+                        <button type="button" class="btn btn-secondary" id="btn-scan-camera">Kamerayı Aç</button>
+                        <button type="button" class="btn btn-secondary" id="btn-scan-upload">Dosya Yükle</button>
                     </div>
                 </div>
                 <input type="file" id="scan-camera-input" accept="image/*" capture="environment" style="display:none;">
-                <input type="file" id="scan-file-input" accept="image/*,application/pdf" style="display:none;">
+                <input type="file" id="scan-file-input" accept="image/jpeg,image/png,image/webp" style="display:none;">
                 <div id="scan-status" style="display:none; margin-top:10px; font-size:13px; color:var(--muted);">Görüntü taranıyor, lütfen bekleyin...</div>
             </div>
 
-            <form class="card form-card" id="invoice-form">
+            <form class="card form-card" id="form-new-invoice">
                 <div class="form-grid">
                     <div class="form-group">
                         <label>Fatura No</label>
-                        <input type="text" placeholder="Kaydedilince otomatik atanacak" readonly style="background:#f8fafc;">
+                        <input type="text" value="Kaydedince otomatik atanır" readonly style="background:#f8fafc;">
                     </div>
                     <div class="form-group">
                         <label>Cari / Müşteri</label>
-                        <select id="select-cari">
-                            <option value="">Yükleniyor...</option>
-                        </select>
+                        <select id="select-cari"></select>
+                    </div>
+                    <div class="form-group" id="branch-field" hidden>
+                        <label>Şube</label>
+                        <select id="select-branch"></select>
                     </div>
                     <div class="form-group">
                         <label>Fatura Türü</label>
-                        <select id="select-turu">
+                        <select id="select-fatura-turu">
                             <option>E-Fatura</option>
                             <option>E-Arşiv</option>
                         </select>
                     </div>
                     <div class="form-group">
                         <label>Kesim Tarihi</label>
-                        <input type="date" id="kesim_tarihi" value="2026-08-06">
+                        <input type="date" id="kesim-tarihi">
                     </div>
                     <div class="form-group">
                         <label>Vade Tarihi</label>
-                        <input type="date" id="vade_tarihi" value="2026-09-06">
+                        <input type="date" id="vade-tarihi">
                     </div>
                     <div class="form-group">
                         <label>Fatura Notu</label>
@@ -111,7 +113,7 @@
                                         <button type="button" class="mic-btn" title="Sesle yaz">🎤</button>
                                     </div>
                                 </td>
-                                <td><input class="table-input item-qty" type="number" value="1" min="1"></td>
+                                <td><input class="table-input item-qty" type="number" value="0" min="1"></td>
                                 <td><input class="table-input item-price" type="number" value="0"></td>
                                 <td>
                                     <select class="table-input item-vat">
@@ -150,37 +152,44 @@
             const urlParams = new URLSearchParams(window.location.search);
             const selectedCariFromUrl = urlParams.get('cari');
             const selectCari = document.getElementById('select-cari');
+            const selectBranch = document.getElementById('select-branch');
+            const branchField = document.getElementById('branch-field');
+            const kesimInput = document.getElementById('kesim-tarihi');
+            const vadeInput = document.getElementById('vade-tarihi');
 
-            async function loadAccounts() {
-                try {
-                    const res = await authFetch('/api/accounts');
-                    if (res.status === 401) {
-                        window.location.href = 'login.html';
-                        return;
-                    }
-                    const accounts = await res.json();
-                    if (!res.ok || !Array.isArray(accounts) || accounts.length === 0) {
-                        selectCari.innerHTML = '<option value="">Önce bir cari ekleyin</option>';
-                        showToast('Kayıtlı cariniz yok. Önce Cariler sayfasından bir cari ekleyin.', 'error');
-                        return;
-                    }
-                    selectCari.innerHTML = accounts
-                        .map(a => `<option value="${a.id}">${a.cari_adi}</option>`)
-                        .join('');
-                    if (selectedCariFromUrl) {
-                        for (let i = 0; i < selectCari.options.length; i++) {
-                            if (selectCari.options[i].text.toLowerCase() === selectedCariFromUrl.toLowerCase()) {
-                                selectCari.selectedIndex = i;
-                                break;
-                            }
-                        }
-                    }
-                } catch {
-                    selectCari.innerHTML = '<option value="">Cariler yüklenemedi</option>';
-                    showToast('Sunucuya bağlanılamadı. npm run dev çalışıyor mu?', 'error');
+            const today = new Date();
+            const inMonth = new Date(today.getFullYear(), today.getMonth() + 1, today.getDate());
+            kesimInput.value = today.toISOString().slice(0, 10);
+            vadeInput.value = inMonth.toISOString().slice(0, 10);
+
+            try {
+                const cariler = await apiFetch('/api/accounts');
+                selectCari.innerHTML = cariler
+                    .map((c) => `<option value="${c.id}">${escapeHtml(c.cari_adi)}</option>`)
+                    .join('');
+                if (selectedCariFromUrl) {
+                    const match = cariler.find((c) => c.cari_adi.toLowerCase() === selectedCariFromUrl.toLowerCase());
+                    if (match) selectCari.value = match.id;
                 }
+                if (!cariler.length) {
+                    showToast('Önce Cari Hesaplar sayfasından bir cari ekleyin', 'error');
+                }
+            } catch (err) {
+                showToast(err.message || 'Cariler alınamadı', 'error');
             }
-            await loadAccounts();
+
+            try {
+                const businessId = activeBusinessId();
+                if (businessId) {
+                    const branches = await apiFetch('/api/businesses/' + businessId + '/branches');
+                    if (branches.length > 1) {
+                        selectBranch.innerHTML = branches
+                            .map((b) => `<option value="${b.id}">${escapeHtml(b.sube_adi)}</option>`)
+                            .join('');
+                        branchField.hidden = false;
+                    }
+                }
+            } catch {}
 
             const itemsBody = document.getElementById('items-body');
             const btnAddRow = document.getElementById('btn-add-row');
@@ -216,30 +225,110 @@
             if (btnAddRow) {
                 btnAddRow.addEventListener('click', function () {
                     const tr = document.createElement('tr');
-                    tr.innerHTML = `
+                    tr.innerHTML = itemRowHtml();
+                    itemsBody.appendChild(tr);
+                    calculateTotals();
+                });
+            }
+
+            function itemRowHtml(item = {}) {
+                const desc = item.aciklama != null ? escapeHtml(String(item.aciklama)) : '';
+                const qty = item.miktar != null ? Number(item.miktar) : 1;
+                const price = item.birim_fiyat != null ? Number(item.birim_fiyat) : 0;
+                const vat = item.kdv_orani != null ? Number(item.kdv_orani) : 20;
+                return `
               <td>
                 <div class="input-mic">
-                  <input class="table-input item-desc" placeholder="Konuşun, faturaya yazılsın...">
+                  <input class="table-input item-desc" placeholder="Konuşun, faturaya yazılsın..." value="${desc}">
                   <button type="button" class="mic-btn" title="Sesle yaz">🎤</button>
                 </div>
               </td>
-              <td><input class="table-input item-qty" type="number" value="1" min="1"></td>
-              <td><input class="table-input item-price" type="number" value="0"></td>
+              <td><input class="table-input item-qty" type="number" value="${qty}" min="1"></td>
+              <td><input class="table-input item-price" type="number" value="${price}"></td>
               <td>
                 <select class="table-input item-vat">
-                  <option value="20" selected>%20</option>
-                  <option value="10">%10</option>
-                  <option value="1">%1</option>
-                  <option value="0">%0</option>
+                  <option value="20"${vat === 20 ? ' selected' : ''}>%20</option>
+                  <option value="10"${vat === 10 ? ' selected' : ''}>%10</option>
+                  <option value="1"${vat === 1 ? ' selected' : ''}>%1</option>
+                  <option value="0"${vat === 0 ? ' selected' : ''}>%0</option>
                 </select>
               </td>
               <td class="item-total money" style="font-weight:600;">₺0,00</td>
               <td><button type="button" class="text-btn btn-delete-row" style="color:var(--danger);">Sil</button></td>
             `;
-                    itemsBody.appendChild(tr);
-                    calculateTotals();
-                });
             }
+
+            function fillFormFromScan(data) {
+                if (data.cari_adi) {
+                    const target = String(data.cari_adi).toLowerCase().trim();
+                    const noise = /^(bilgileri?|bilgi|ad[ıi]|unvan[ıi]|fatura|müşteri|alıcı)$/i.test(target);
+                    let matched = false;
+                    if (!noise && target.length >= 3) {
+                        for (let i = 0; i < selectCari.options.length; i++) {
+                            const optText = selectCari.options[i].text.toLowerCase();
+                            if (
+                                optText === target ||
+                                (optText.length >= 3 && (optText.includes(target) || target.includes(optText)))
+                            ) {
+                                selectCari.selectedIndex = i;
+                                matched = true;
+                                break;
+                            }
+                        }
+                        if (!matched) {
+                            // Kırmızı hata değil: OCR isim buldu ama cari hesaplarda yok
+                            showToast(
+                              'OCR cari: "' + data.cari_adi + '". Listede yoksa Cari / Müşteri’den seçin veya yeni cari ekleyin.'
+                            );
+                        }
+                    }
+                }
+                if (data.tarih) kesimInput.value = data.tarih;
+                if (data.vade_tarihi) vadeInput.value = data.vade_tarihi;
+                if (data.fatura_notu && !/fatura\s*tarih|senaryo|fatura\s*tip|bilgi/i.test(data.fatura_notu)) {
+                    const note = document.getElementById('fatura_notu');
+                    if (note) note.value = data.fatura_notu;
+                }
+                if (Array.isArray(data.kalemler) && data.kalemler.length > 0) {
+                    itemsBody.innerHTML = '';
+                    data.kalemler.forEach((item) => {
+                        const tr = document.createElement('tr');
+                        tr.innerHTML = itemRowHtml(item);
+                        itemsBody.appendChild(tr);
+                    });
+                    calculateTotals();
+                }
+                showToast('Görüntüden bilgiler dolduruldu, kontrol edip kaydedin.');
+            }
+
+            async function handleScanFile(file) {
+                if (!file) return;
+                const scanStatus = document.getElementById('scan-status');
+                scanStatus.style.display = 'block';
+                try {
+                    const formData = new FormData();
+                    formData.append('belge', file);
+                    const data = await apiFetch('/api/invoices/scan', { method: 'POST', body: formData });
+                    fillFormFromScan(data);
+                } catch (err) {
+                    showToast(err.message || 'Görüntü okunamadı', 'error');
+                } finally {
+                    scanStatus.style.display = 'none';
+                }
+            }
+
+            const scanCameraInput = document.getElementById('scan-camera-input');
+            const scanFileInput = document.getElementById('scan-file-input');
+            document.getElementById('btn-scan-camera')?.addEventListener('click', () => scanCameraInput.click());
+            document.getElementById('btn-scan-upload')?.addEventListener('click', () => scanFileInput.click());
+            scanCameraInput.addEventListener('change', () => {
+                handleScanFile(scanCameraInput.files[0]);
+                scanCameraInput.value = '';
+            });
+            scanFileInput.addEventListener('change', () => {
+                handleScanFile(scanFileInput.files[0]);
+                scanFileInput.value = '';
+            });
 
             document.getElementById("repeat-invoice")?.addEventListener("change", function () {
                 if (this.checked) showToast("Bu fatura her ay otomatik tekrarlanacak");
@@ -262,166 +351,38 @@
                 }
             });
 
-            function itemRowHtml(item) {
-                const desc = (item?.aciklama || '').toString();
-                const qty = item?.miktar ?? 1;
-                const price = item?.birim_fiyat ?? 0;
-                const vat = item?.kdv_orani ?? 20;
-                return `
-              <td>
-                <div class="input-mic">
-                  <input class="table-input item-desc" placeholder="Konuşun, faturaya yazılsın..." value="${desc.replace(/"/g, '&quot;')}">
-                  <button type="button" class="mic-btn" title="Sesle yaz">🎤</button>
-                </div>
-              </td>
-              <td><input class="table-input item-qty" type="number" value="${qty}" min="1"></td>
-              <td><input class="table-input item-price" type="number" value="${price}"></td>
-              <td>
-                <select class="table-input item-vat">
-                  <option value="20"${Number(vat) === 20 ? ' selected' : ''}>%20</option>
-                  <option value="10"${Number(vat) === 10 ? ' selected' : ''}>%10</option>
-                  <option value="1"${Number(vat) === 1 ? ' selected' : ''}>%1</option>
-                  <option value="0"${Number(vat) === 0 ? ' selected' : ''}>%0</option>
-                </select>
-              </td>
-              <td class="item-total money" style="font-weight:600;">₺0,00</td>
-              <td><button type="button" class="text-btn btn-delete-row" style="color:var(--danger);">Sil</button></td>
-            `;
-            }
-
-            function fillFormFromScan(data) {
-                if (data.cari_adi) {
-                    const target = data.cari_adi.toLowerCase();
-                    let matched = false;
-                    for (let i = 0; i < selectCari.options.length; i++) {
-                        const optText = selectCari.options[i].text.toLowerCase();
-                        if (optText === target || optText.includes(target) || target.includes(optText)) {
-                            selectCari.selectedIndex = i;
-                            matched = true;
-                            break;
-                        }
-                    }
-                    if (!matched) {
-                        showToast(`"${data.cari_adi}" isimli cari bulunamadı, lütfen listeden manuel seçin.`, 'error');
-                    }
-                }
-                if (data.tarih) document.getElementById('kesim_tarihi').value = data.tarih;
-                if (data.vade_tarihi) document.getElementById('vade_tarihi').value = data.vade_tarihi;
-                if (data.fatura_notu) document.getElementById('fatura_notu').value = data.fatura_notu;
-
-                if (Array.isArray(data.kalemler) && data.kalemler.length > 0) {
-                    itemsBody.innerHTML = '';
-                    data.kalemler.forEach(item => {
-                        const tr = document.createElement('tr');
-                        tr.innerHTML = itemRowHtml(item);
-                        itemsBody.appendChild(tr);
-                    });
-                    calculateTotals();
-                }
-                showToast('Görüntüden bilgiler dolduruldu, lütfen kontrol edip kaydedin.');
-            }
-
-            async function handleScanFile(file) {
-                if (!file) return;
-                const scanStatus = document.getElementById('scan-status');
-                scanStatus.style.display = 'block';
-                try {
-                    const formData = new FormData();
-                    formData.append('belge', file);
-                    const res = await authFetch('/api/invoices/scan', { method: 'POST', body: formData });
-                    if (res.status === 401) {
-                        window.location.href = 'login.html';
-                        return;
-                    }
-                    const data = await res.json();
-                    if (!res.ok) {
-                        showToast(data.error || 'Görüntü okunamadı', 'error');
-                        return;
-                    }
-                    fillFormFromScan(data);
-                } catch {
-                    showToast('Sunucuya bağlanılamadı. npm run dev çalışıyor mu?', 'error');
-                } finally {
-                    scanStatus.style.display = 'none';
-                }
-            }
-
-            const scanCameraInput = document.getElementById('scan-camera-input');
-            const scanFileInput = document.getElementById('scan-file-input');
-            document.getElementById('btn-scan-camera')?.addEventListener('click', () => scanCameraInput.click());
-            document.getElementById('btn-scan-upload')?.addEventListener('click', () => scanFileInput.click());
-            scanCameraInput.addEventListener('change', () => handleScanFile(scanCameraInput.files[0]));
-            scanFileInput.addEventListener('change', () => handleScanFile(scanFileInput.files[0]));
-
-            const invoiceForm = document.getElementById('invoice-form');
-            invoiceForm.addEventListener('submit', async function (e) {
+            document.getElementById('form-new-invoice').addEventListener('submit', async function (e) {
                 e.preventDefault();
-
-                const account_id = selectCari.value;
-                if (!account_id) {
-                    showToast('Lütfen bir cari seçin.', 'error');
+                if (!selectCari.value) {
+                    showToast('Önce bir cari seçin', 'error');
                     return;
                 }
-
-                const kalemler = [...itemsBody.querySelectorAll('tr')].map(row => ({
-                    aciklama: row.querySelector('.item-desc')?.value || '',
-                    miktar: Number(row.querySelector('.item-qty')?.value || 1),
-                    birim_fiyat: Number(row.querySelector('.item-price')?.value || 0),
-                    kdv_orani: Number(row.querySelector('.item-vat')?.value ?? 20),
+                const kalemler = [...itemsBody.querySelectorAll('tr')].map((row) => ({
+                    aciklama: row.querySelector('.item-desc').value,
+                    miktar: row.querySelector('.item-qty').value,
+                    birim_fiyat: row.querySelector('.item-price').value,
+                    kdv_orani: row.querySelector('.item-vat').value,
                 }));
 
-                const payload = {
-                    account_id,
-                    fatura_turu: document.getElementById('select-turu').value,
-                    kesim_tarihi: document.getElementById('kesim_tarihi').value,
-                    vade_tarihi: document.getElementById('vade_tarihi').value,
-                    fatura_notu: document.getElementById('fatura_notu').value || null,
-                    kalemler,
-                };
-
-                const submitBtn = invoiceForm.querySelector('button[type="submit"]');
+                const submitBtn = this.querySelector('button[type=submit]');
                 if (submitBtn) submitBtn.disabled = true;
-
                 try {
-                    const res = await authFetch('/api/invoices', {
+                    await apiFetch('/api/invoices', {
                         method: 'POST',
-                        headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify(payload),
+                        body: {
+                            account_id: selectCari.value,
+                            branch_id: branchField.hidden ? null : selectBranch.value,
+                            fatura_turu: document.getElementById('select-fatura-turu').value,
+                            kesim_tarihi: kesimInput.value,
+                            vade_tarihi: vadeInput.value,
+                            fatura_notu: document.getElementById('fatura_notu').value,
+                            kalemler,
+                        },
                     });
-                    if (res.status === 401) {
-                        window.location.href = 'login.html';
-                        return;
-                    }
-                    const data = await res.json();
-                    if (!res.ok) {
-                        showToast(data.error || 'Fatura oluşturulamadı', 'error');
-                        return;
-                    }
-
-                    if (document.getElementById('repeat-invoice')?.checked) {
-                        try {
-                            const first = kalemler[0] || {};
-                            await authFetch('/api/invoices/templates', {
-                                method: 'POST',
-                                headers: { 'Content-Type': 'application/json' },
-                                body: JSON.stringify({
-                                    account_id,
-                                    fatura_sikligi: 'Aylık',
-                                    baslangic_tarihi: payload.kesim_tarihi,
-                                    aciklama: first.aciklama,
-                                    miktar: first.miktar,
-                                    birim_fiyat: first.birim_fiyat,
-                                    kdv_orani: first.kdv_orani,
-                                }),
-                            });
-                        } catch {}
-                    }
-
                     showToast('Fatura kaydedildi');
                     setTimeout(() => { window.location.href = 'invoices.html'; }, 600);
-                } catch {
-                    showToast('Sunucuya bağlanılamadı. npm run dev çalışıyor mu?', 'error');
-                } finally {
+                } catch (err) {
+                    showToast(err.message || 'Fatura kaydedilemedi', 'error');
                     if (submitBtn) submitBtn.disabled = false;
                 }
             });

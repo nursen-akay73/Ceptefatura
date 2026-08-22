@@ -172,31 +172,7 @@
                     <div><strong>Güncel Bakiye:</strong> <br><span id="m-account-balance" class="money" style="font-weight:600;">₺25.000,00</span> <span id="m-account-status" class="badge credit">Alacak</span></div>
                     <div><strong>Telefon:</strong> <br><span id="m-account-phone">0555 111 22 33</span></div>
                     <div><strong>E-Posta:</strong> <br><span id="m-account-email">info@abcteknoloji.com</span></div>
-                    <div style="grid-column: span 2;"><strong>Adres:</strong> <br><span id="m-account-address">İstanbul, Maslak</span></div>
                 </div>
-
-                <h3 style="font-size:14px; margin-bottom:8px;">Son Hareket Özetleri</h3>
-                <table style="width:100%; font-size:12px; border-collapse:collapse;">
-                    <thead>
-                        <tr style="background:#f8fafc; text-align:left;">
-                            <th style="padding:6px;">Tarih</th>
-                            <th style="padding:6px;">İşlem</th>
-                            <th style="padding:6px;">Tutar</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        <tr>
-                            <td style="padding:6px; border-bottom:1px solid #f1f5f9;">03.08.2026</td>
-                            <td style="padding:6px; border-bottom:1px solid #f1f5f9;">Satış Faturası (INV-2026-001)</td>
-                            <td style="padding:6px; border-bottom:1px solid #f1f5f9;">₺12.500</td>
-                        </tr>
-                        <tr>
-                            <td style="padding:6px; border-bottom:1px solid #f1f5f9;">15.07.2026</td>
-                            <td style="padding:6px; border-bottom:1px solid #f1f5f9;">Tahsilat (Banka Havalesi)</td>
-                            <td style="padding:6px; border-bottom:1px solid #f1f5f9;">₺12.500</td>
-                        </tr>
-                    </tbody>
-                </table>
             </div>
             <div style="display:flex; justify-content:flex-end; gap:10px; margin-top:20px; border-top:1px solid #f1f5f9; padding-top:12px;">
                 <button class="btn btn-secondary" id="closeDetailBtn">Kapat</button>
@@ -251,138 +227,104 @@
 
     <script src="../assets/js/script.js"></script>
     <script>
-        document.addEventListener('DOMContentLoaded', async function () {
+        document.addEventListener('DOMContentLoaded', function () {
             const searchInput = document.getElementById('search-accounts');
             const tabBtns = document.querySelectorAll('.tab-btn');
-            const tbody = document.getElementById('accounts-table-body');
+            const tableBody = document.getElementById('accounts-table-body');
+            const money = (n) => '₺' + Number(n || 0).toLocaleString('tr-TR', { minimumFractionDigits: 2 });
+            const TUR_LABEL = { musteri: 'Müşteri', tedarikci: 'Tedarikçi' };
 
             let activeType = 'tum';
-            let allAccounts = [];
+            let accounts = [];
 
-            function formatMoneyTR(n) {
-                return '₺' + Number(n || 0).toLocaleString('tr-TR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+            function durumOf(bakiye) {
+                const n = Number(bakiye) || 0;
+                if (n > 0) return 'Alacak';
+                if (n < 0) return 'Borç';
+                return 'Dengede';
             }
 
-            function roleLabel(turu) {
-                if (turu === 'musteri') return 'Müşteri';
-                if (turu === 'tedarikci') return 'Tedarikçi';
-                return turu || '-';
+            function renderRow(acc) {
+                const turLabel = TUR_LABEL[acc.turu] || acc.turu || '—';
+                const durum = durumOf(acc.bakiye);
+                const tr = document.createElement('tr');
+                tr.dataset.type = acc.turu || '';
+                tr.innerHTML = `
+            <td><strong></strong></td>
+            <td><span class="badge ${acc.turu === 'tedarikci' ? 'warning' : 'success'}"></span></td>
+            <td></td>
+            <td></td>
+            <td></td>
+            <td class="money"></td>
+            <td><span class="badge ${durum === 'Alacak' ? 'credit' : durum === 'Borç' ? 'debit' : 'balanced'}"></span></td>
+            <td><button class="text-btn btn-account-detail">Detay</button></td>
+          `;
+                tr.querySelector('strong').textContent = acc.cari_adi;
+                tr.querySelectorAll('.badge')[0].textContent = turLabel;
+                tr.children[2].textContent = acc.vergi_no || '—';
+                tr.children[3].textContent = acc.telefon || '—';
+                tr.children[4].textContent = acc.email || '—';
+                tr.querySelector('.money').textContent = money(acc.bakiye);
+                tr.querySelectorAll('.badge')[1].textContent = durum;
+                tr.querySelector('.btn-account-detail').addEventListener('click', () => openDetail(acc, turLabel, durum));
+                return tr;
             }
 
-            function roleBadgeClass(turu) {
-                if (turu === 'musteri') return 'success';
-                if (turu === 'tedarikci') return 'warning';
-                return '';
-            }
-
-            function statusFor(bakiye) {
-                const n = Number(bakiye || 0);
-                if (n > 0) return { text: 'Alacak', cls: 'credit' };
-                if (n < 0) return { text: 'Borç', cls: 'debit' };
-                return { text: 'Dengede', cls: 'balanced' };
-            }
-
-            function renderAccounts(list) {
-                tbody.innerHTML = list.map(a => {
-                    const status = statusFor(a.bakiye);
-                    return `
-                    <tr data-type="${a.turu || ''}">
-                        <td><strong>${a.cari_adi}</strong></td>
-                        <td><span class="badge ${roleBadgeClass(a.turu)}">${roleLabel(a.turu)}</span></td>
-                        <td>${a.vergi_no || '-'}</td>
-                        <td>${a.telefon || '-'}</td>
-                        <td>${a.email || '-'}</td>
-                        <td class="money">${formatMoneyTR(a.bakiye)}</td>
-                        <td><span class="badge ${status.cls}">${status.text}</span></td>
-                        <td>
-                            <button class="text-btn btn-account-detail"
-                                    data-id="${a.id}"
-                                    data-name="${a.cari_adi}"
-                                    data-role="${roleLabel(a.turu)}"
-                                    data-vno="${a.vergi_no || '-'}"
-                                    data-phone="${a.telefon || '-'}"
-                                    data-email="${a.email || '-'}"
-                                    data-balance="${formatMoneyTR(a.bakiye)}"
-                                    data-status="${status.text}">
-                                Detay
-                            </button>
-                        </td>
-                    </tr>`;
-                }).join('');
+            function filterAndRender() {
+                const query = (searchInput.value || '').toLowerCase().trim();
+                tableBody.innerHTML = '';
+                accounts
+                    .filter((acc) => activeType === 'tum' || acc.turu === activeType)
+                    .filter((acc) => !query || JSON.stringify(acc).toLowerCase().includes(query))
+                    .forEach((acc) => tableBody.appendChild(renderRow(acc)));
                 syncEmptyStates();
-            }
-
-            function filterTable() {
-                const query = searchInput.value.toLowerCase().trim();
-                const filtered = allAccounts.filter(a => {
-                    const matchesTab = (activeType === 'tum') || (a.turu === activeType);
-                    const text = [a.cari_adi, a.vergi_no, a.telefon, a.email].filter(Boolean).join(' ').toLowerCase();
-                    const matchesSearch = !query || text.includes(query);
-                    return matchesTab && matchesSearch;
-                });
-                renderAccounts(filtered);
             }
 
             async function loadAccounts() {
                 try {
-                    const res = await authFetch('/api/accounts');
-                    if (res.status === 401) {
-                        window.location.href = 'login.html';
-                        return;
-                    }
-                    const data = await res.json();
-                    if (!res.ok) {
-                        showToast(data.error || 'Cariler alınamadı', 'error');
-                        return;
-                    }
-                    allAccounts = data;
-                    filterTable();
-                } catch {
-                    showToast('Sunucuya bağlanılamadı. npm run dev çalışıyor mu?', 'error');
+                    accounts = await apiFetch('/api/accounts');
+                    filterAndRender();
+                } catch (err) {
+                    showToast(err.message || 'Cariler alınamadı', 'error');
                 }
             }
+            loadAccounts();
 
             tabBtns.forEach(btn => {
                 btn.addEventListener('click', function () {
                     tabBtns.forEach(b => b.classList.remove('active'));
                     this.classList.add('active');
                     activeType = this.getAttribute('data-type');
-                    filterTable();
+                    filterAndRender();
                 });
             });
 
-            searchInput.addEventListener('input', filterTable);
+            searchInput.addEventListener('input', filterAndRender);
 
             const detailModal = document.getElementById('accountDetailModal');
             const closeDetailModal = document.getElementById('closeDetailModal');
             const closeDetailBtn = document.getElementById('closeDetailBtn');
 
-            tbody.addEventListener('click', function (e) {
-                const btn = e.target.closest('.btn-account-detail');
-                if (!btn) return;
-                document.getElementById('m-account-name').innerText = btn.getAttribute('data-name');
-                document.getElementById('m-account-role').innerText = btn.getAttribute('data-role');
-                document.getElementById('m-account-vno').innerText = btn.getAttribute('data-vno');
-                document.getElementById('m-account-phone').innerText = btn.getAttribute('data-phone');
-                document.getElementById('m-account-email').innerText = btn.getAttribute('data-email');
-                document.getElementById('m-account-balance').innerText = btn.getAttribute('data-balance');
-                const status = btn.getAttribute('data-status') || '';
+            function openDetail(acc, turLabel, durum) {
+                document.getElementById('m-account-name').innerText = acc.cari_adi;
+                document.getElementById('m-account-role').innerText = turLabel;
+                document.getElementById('m-account-vno').innerText = acc.vergi_no || '—';
+                document.getElementById('m-account-phone').innerText = acc.telefon || '—';
+                document.getElementById('m-account-email').innerText = acc.email || '—';
+                document.getElementById('m-account-balance').innerText = money(acc.bakiye);
                 const statusEl = document.getElementById('m-account-status');
                 if (statusEl) {
-                    statusEl.textContent = status;
-                    statusEl.className = 'badge ' + (status === 'Alacak' ? 'credit' : status === 'Borç' ? 'debit' : 'balanced');
+                    statusEl.textContent = durum;
+                    statusEl.className = 'badge ' + (durum === 'Alacak' ? 'credit' : durum === 'Borç' ? 'debit' : 'balanced');
                 }
-                document.getElementById('m-account-address').innerText = '-';
                 const invoiceLink = document.getElementById('btn-invoice-for-account');
-                if (invoiceLink) invoiceLink.href = 'invoice-new.html?cari=' + encodeURIComponent(btn.getAttribute('data-name'));
-
+                if (invoiceLink) invoiceLink.href = 'invoice-new.html?cari=' + encodeURIComponent(acc.cari_adi);
                 detailModal.classList.add('active');
-            });
+            }
 
             function hideDetailModal() { detailModal.classList.remove('active'); }
             if (closeDetailModal) closeDetailModal.addEventListener('click', hideDetailModal);
             if (closeDetailBtn) closeDetailBtn.addEventListener('click', hideDetailModal);
-
 
             const newModal = document.getElementById('newAccountModal');
             const btnOpenNew = document.getElementById('btn-open-new');
@@ -393,57 +335,35 @@
             if (btnOpenNew) {
                 btnOpenNew.addEventListener('click', () => newModal.classList.add('active'));
             }
-            document.getElementById('btn-empty-new-account')?.addEventListener('click', () => newModal.classList.add('active'));
             function hideNewModal() { newModal.classList.remove('active'); }
             if (closeNewModal) closeNewModal.addEventListener('click', hideNewModal);
             if (closeNewBtn) closeNewBtn.addEventListener('click', hideNewModal);
 
             formNewAccount.addEventListener('submit', async function (e) {
                 e.preventDefault();
-                const payload = {
-                    cari_adi: document.getElementById('new-name').value.trim(),
-                    turu: document.getElementById('new-role').value,
-                    vergi_no: document.getElementById('new-vno').value.trim() || null,
-                    telefon: document.getElementById('new-phone').value.trim() || null,
-                    email: document.getElementById('new-email').value.trim() || null,
-                };
-                if (!payload.cari_adi) {
-                    showToast('Cari / Firma adı zorunlu', 'error');
-                    return;
-                }
-                const submitBtn = formNewAccount.querySelector('button[type="submit"]');
-                if (submitBtn) submitBtn.disabled = true;
+                const cari_adi = document.getElementById('new-name').value.trim();
+                const turu = document.getElementById('new-role').value;
+                const vergi_no = document.getElementById('new-vno').value.trim();
+                const telefon = document.getElementById('new-phone').value.trim();
+                const email = document.getElementById('new-email').value.trim();
+
                 try {
-                    const res = await authFetch('/api/accounts', {
+                    await apiFetch('/api/accounts', {
                         method: 'POST',
-                        headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify(payload),
+                        body: { cari_adi, turu, vergi_no, telefon, email },
                     });
-                    if (res.status === 401) {
-                        window.location.href = 'login.html';
-                        return;
-                    }
-                    const data = await res.json();
-                    if (!res.ok) {
-                        showToast(data.error || 'Cari oluşturulamadı', 'error');
-                        return;
-                    }
                     showToast('Yeni cari hesap kaydedildi');
                     hideNewModal();
                     formNewAccount.reset();
-                    await loadAccounts();
-                } catch {
-                    showToast('Sunucuya bağlanılamadı. npm run dev çalışıyor mu?', 'error');
-                } finally {
-                    if (submitBtn) submitBtn.disabled = false;
+                    loadAccounts();
+                } catch (err) {
+                    showToast(err.message || 'Cari oluşturulamadı', 'error');
                 }
             });
             window.addEventListener('click', function (e) {
                 if (e.target === detailModal) hideDetailModal();
                 if (e.target === newModal) hideNewModal();
             });
-
-            await loadAccounts();
         });
     </script>
 </body>

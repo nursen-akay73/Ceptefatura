@@ -127,6 +127,9 @@
                         <option value="E-Fatura">E-Fatura</option>
                         <option value="E-Arşiv">E-Arşiv</option>
                     </select>
+                    <select id="filter-branch" hidden>
+                        <option value="">Tüm Şubeler</option>
+                    </select>
                 </div>
 
                 <div class="table-wrap">
@@ -169,13 +172,12 @@
             </div>
             <div class="modal-body">
                 <div style="display:grid; grid-template-columns:1fr 1fr; gap:12px; margin-bottom:16px; font-size:13px;">
-                    <div><strong>Müşteri / Cari:</strong> <span id="m-cari">ABC Teknoloji</span></div>
-                    <div><strong>Kesim Tarihi:</strong> <span id="m-tarih">03.08.2026</span></div>
-                    <div><strong>Durum:</strong> <span id="m-durum">Ödendi</span></div>
-                    <div><strong>Ödeme Yöntemi:</strong> Banka Havalesi / EFT</div>
+                    <div><strong>Müşteri / Cari:</strong> <span id="m-cari">—</span></div>
+                    <div><strong>Kesim Tarihi:</strong> <span id="m-tarih">—</span></div>
+                    <div><strong>Durum:</strong> <span id="m-durum">—</span></div>
+                    <div><strong>Vade Tarihi:</strong> <span id="m-vade">—</span></div>
                 </div>
 
-           
                 <table class="invoice-preview-table">
                     <thead>
                         <tr style="background:#f8fafc;">
@@ -185,18 +187,18 @@
                             <th>Tutar</th>
                         </tr>
                     </thead>
-                    <tbody id="m-kalemler-body">
-                    </tbody>
+                    <tbody id="m-kalemler"></tbody>
                 </table>
 
                 <div class="invoice-summary">
                     <div style="font-size:15px; font-weight:bold; color:var(--primary); margin-top:8px;">
-                        Genel Toplam: <span id="m-toplam">₺12.500,00</span>
+                        Genel Toplam: <span id="m-toplam">—</span>
                     </div>
                 </div>
             </div>
             <div style="display:flex; justify-content:flex-end; gap:10px; margin-top:20px; border-top:1px solid #f1f5f9; padding-top:12px;">
                 <button class="btn btn-secondary" id="closeModalBtn">Kapat</button>
+                <button class="btn btn-primary" type="button" id="btn-pay-invoice" hidden>Ödeme Yap →</button>
                 <button class="btn btn-primary" type="button" id="btn-pdf-invoice">PDF İndir</button>
             </div>
         </div>
@@ -204,127 +206,124 @@
 
     <script src="../assets/js/script.js"></script>
     <script>
-        document.addEventListener('DOMContentLoaded', async function () {
+        document.addEventListener('DOMContentLoaded', function () {
 
             const searchInput = document.getElementById('filter-search');
             const statusSelect = document.getElementById('filter-status');
             const typeSelect = document.getElementById('filter-type');
-            const tbody = document.getElementById('invoice-table-body');
-            let allInvoices = [];
+            const branchSelect = document.getElementById('filter-branch');
+            const tableBody = document.getElementById('invoice-table-body');
+            const money = (n) => '₺' + Number(n || 0).toLocaleString('tr-TR', { minimumFractionDigits: 2 });
+            const dateTr = (d) => d ? new Date(d).toLocaleDateString('tr-TR') : '—';
 
-            function formatMoneyTR(n) {
-                return '₺' + Number(n || 0).toLocaleString('tr-TR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+            async function loadBranches() {
+                const businessId = activeBusinessId();
+                if (!businessId) return;
+                try {
+                    const branches = await apiFetch('/api/businesses/' + businessId + '/branches');
+                    if (branches.length > 1) {
+                        branches.forEach((b) => {
+                            const opt = document.createElement('option');
+                            opt.value = b.id;
+                            opt.textContent = b.sube_adi;
+                            branchSelect.appendChild(opt);
+                        });
+                        branchSelect.hidden = false;
+                    }
+                } catch {}
             }
 
-            function formatDateTR(iso) {
-                if (!iso) return '-';
-                const [y, m, d] = String(iso).slice(0, 10).split('-');
-                return `${d}.${m}.${y}`;
-            }
-
-            function badgeClass(durum) {
+            function statusBadgeClass(durum) {
                 if (durum === 'Ödendi') return 'success';
                 if (durum === 'Gecikti') return 'danger';
                 return 'warning';
             }
 
-            function renderInvoices(list) {
-                tbody.innerHTML = list.map(inv => `
-                    <tr>
-                        <td>${inv.fatura_no}</td>
-                        <td>${inv.cari}</td>
-                        <td>${inv.fatura_turu}</td>
-                        <td>${formatDateTR(inv.tarih)}</td>
-                        <td>${formatDateTR(inv.vade)}</td>
-                        <td class="money">${formatMoneyTR(inv.tutar)}</td>
-                        <td><span class="badge ${badgeClass(inv.durum)}">${inv.durum}</span></td>
-                        <td><button class="text-btn btn-detail" data-id="${inv.id}">Detay</button></td>
-                    </tr>
-                `).join('');
-                syncEmptyStates();
-            }
-
-            function applyFilters() {
-                const query = searchInput.value.toLowerCase().trim();
-                const selectedStatus = statusSelect.value;
-                const selectedType = typeSelect.value;
-
-                const filtered = allInvoices.filter(inv => {
-                    const matchesSearch = !query
-                        || inv.fatura_no.toLowerCase().includes(query)
-                        || inv.cari.toLowerCase().includes(query);
-                    const matchesStatus = (selectedStatus === 'Tüm Durumlar') || (inv.durum === selectedStatus);
-                    const matchesType = (selectedType === 'Tüm Türler') || (inv.fatura_turu === selectedType);
-                    return matchesSearch && matchesStatus && matchesType;
-                });
-                renderInvoices(filtered);
+            function renderRow(inv) {
+                const tr = document.createElement('tr');
+                tr.innerHTML = `
+            <td></td>
+            <td></td>
+            <td></td>
+            <td></td>
+            <td></td>
+            <td class="money"></td>
+            <td><span class="badge ${statusBadgeClass(inv.durum)}"></span></td>
+            <td><button class="text-btn btn-detail">Detay</button></td>
+          `;
+                tr.children[0].textContent = inv.fatura_no;
+                tr.children[1].textContent = inv.cari;
+                tr.children[2].textContent = inv.fatura_turu;
+                tr.children[3].textContent = dateTr(inv.tarih);
+                tr.children[4].textContent = dateTr(inv.vade);
+                tr.querySelector('.money').textContent = money(inv.tutar);
+                tr.querySelector('.badge').textContent = inv.durum;
+                tr.querySelector('.btn-detail').addEventListener('click', () => openDetail(inv.id));
+                return tr;
             }
 
             async function loadInvoices() {
+                const params = new URLSearchParams();
+                if (searchInput.value.trim()) params.set('search', searchInput.value.trim());
+                if (statusSelect.value !== 'Tüm Durumlar') params.set('status', statusSelect.value);
+                if (typeSelect.value !== 'Tüm Türler') params.set('type', typeSelect.value);
+                if (branchSelect.value) params.set('branch_id', branchSelect.value);
+
                 try {
-                    const res = await authFetch('/api/invoices');
-                    if (res.status === 401) {
-                        window.location.href = 'login.html';
-                        return;
-                    }
-                    const data = await res.json();
-                    if (!res.ok) {
-                        showToast(data.error || 'Faturalar alınamadı', 'error');
-                        return;
-                    }
-                    allInvoices = data;
-                    applyFilters();
-                } catch {
-                    showToast('Sunucuya bağlanılamadı. npm run dev çalışıyor mu?', 'error');
+                    const list = await apiFetch('/api/invoices?' + params.toString());
+                    tableBody.innerHTML = '';
+                    list.forEach((inv) => tableBody.appendChild(renderRow(inv)));
+                    syncEmptyStates();
+                } catch (err) {
+                    showToast(err.message || 'Faturalar alınamadı', 'error');
                 }
             }
 
-            searchInput.addEventListener('input', applyFilters);
-            statusSelect.addEventListener('change', applyFilters);
-            typeSelect.addEventListener('change', applyFilters);
+            let debounce;
+            searchInput.addEventListener('input', () => { clearTimeout(debounce); debounce = setTimeout(loadInvoices, 300); });
+            statusSelect.addEventListener('change', loadInvoices);
+            typeSelect.addEventListener('change', loadInvoices);
+            branchSelect.addEventListener('change', loadInvoices);
 
             const modal = document.getElementById('invoiceModal');
             const closeModal = document.getElementById('closeModal');
             const closeModalBtn = document.getElementById('closeModalBtn');
-            const kalemlerBody = document.getElementById('m-kalemler-body');
+            const payBtn = document.getElementById('btn-pay-invoice');
+            let currentInvoiceId = null;
 
-            tbody.addEventListener('click', async function (e) {
-                const btn = e.target.closest('.btn-detail');
-                if (!btn) return;
-                const id = btn.getAttribute('data-id');
+            async function openDetail(id) {
                 try {
-                    const res = await authFetch(`/api/invoices/${id}`);
-                    if (res.status === 401) {
-                        window.location.href = 'login.html';
-                        return;
-                    }
-                    const inv = await res.json();
-                    if (!res.ok) {
-                        showToast(inv.error || 'Fatura detayı alınamadı', 'error');
-                        return;
-                    }
-
+                    const inv = await apiFetch('/api/invoices/' + id);
+                    currentInvoiceId = inv.id;
                     document.getElementById('m-fatura-no').innerText = inv.fatura_no;
                     document.getElementById('m-fatura-turu').innerText = inv.fatura_turu;
                     document.getElementById('m-cari').innerText = inv.cari_adi;
-                    document.getElementById('m-tarih').innerText = formatDateTR(inv.kesim_tarihi);
+                    document.getElementById('m-tarih').innerText = dateTr(inv.kesim_tarihi);
+                    document.getElementById('m-vade').innerText = dateTr(inv.vade_tarihi);
                     document.getElementById('m-durum').innerText = inv.durum;
-                    document.getElementById('m-toplam').innerText = formatMoneyTR(inv.tutar);
+                    document.getElementById('m-toplam').innerText = money(inv.tutar);
 
-                    kalemlerBody.innerHTML = (inv.kalemler || []).map(k => `
-                        <tr>
-                            <td>${k.aciklama}</td>
-                            <td>${Number(k.miktar)} Adet</td>
-                            <td>%${Number(k.kdv_orani)}</td>
-                            <td>${formatMoneyTR(k.tutar)}</td>
-                        </tr>
-                    `).join('');
+                    const beklemede = inv.durum === 'Bekliyor' || inv.durum === 'Gecikti';
+                    closeModalBtn.hidden = beklemede;
+                    payBtn.hidden = !beklemede;
+
+                    const kalemlerBody = document.getElementById('m-kalemler');
+                    kalemlerBody.innerHTML = '';
+                    (inv.kalemler || []).forEach((k) => {
+                        const tr = document.createElement('tr');
+                        tr.innerHTML = `<td></td><td></td><td></td><td></td>`;
+                        tr.children[0].textContent = k.aciklama;
+                        tr.children[1].textContent = k.miktar + ' Adet';
+                        tr.children[2].textContent = '%' + k.kdv_orani;
+                        tr.children[3].textContent = money(k.tutar);
+                        kalemlerBody.appendChild(tr);
+                    });
 
                     modal.classList.add('active');
-                } catch {
-                    showToast('Sunucuya bağlanılamadı. npm run dev çalışıyor mu?', 'error');
+                } catch (err) {
+                    showToast(err.message || 'Fatura detayı alınamadı', 'error');
                 }
-            });
+            }
 
             function hideModal() {
                 modal.classList.remove('active');
@@ -336,7 +335,41 @@
                 if (e.target === modal) hideModal();
             });
 
-            await loadInvoices();
+            payBtn.addEventListener('click', async function () {
+                if (!currentInvoiceId) return;
+                payBtn.disabled = true;
+                try {
+                    const result = await apiFetch('/api/invoices/' + currentInvoiceId + '/payment', { method: 'POST' });
+                    if (result.paymentPageUrl) {
+                        window.location.href = result.paymentPageUrl;
+                        return;
+                    }
+                    if (result.demo) {
+                        showToast('Demo ödeme alındı — fatura Ödendi');
+                        hideModal();
+                        loadInvoices();
+                        payBtn.disabled = false;
+                        return;
+                    }
+                    showToast('Ödeme yanıtı alınamadı', 'error');
+                    payBtn.disabled = false;
+                } catch (err) {
+                    showToast(err.message || 'Ödeme başlatılamadı', 'error');
+                    payBtn.disabled = false;
+                }
+            });
+
+            const paymentParam = new URLSearchParams(window.location.search).get('payment');
+            if (paymentParam === 'success') {
+                showToast('Ödeme alındı, fatura ödendi olarak işaretlendi');
+            } else if (paymentParam === 'failed') {
+                showToast('Ödeme tamamlanamadı', 'error');
+            }
+            if (paymentParam) {
+                history.replaceState(null, '', window.location.pathname);
+            }
+
+            loadBranches().then(loadInvoices);
         });
     </script>
 </body>

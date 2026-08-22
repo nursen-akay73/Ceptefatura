@@ -131,93 +131,82 @@
         document.addEventListener('DOMContentLoaded', function () {
             const periodSelect = document.getElementById('select-period');
             const typeSelect = document.getElementById('select-type');
+            const money = (n) => '₺' + Number(n || 0).toLocaleString('tr-TR', { minimumFractionDigits: 0 });
 
-            const reportData = {
-                all: {
-                    title: "12 Aylık Yıllık Görünüm",
-                    cash: "₺245.000",
-                    vatSales: "₺32.400",
-                    vatBuy: "₺6.200",
-                    vatNet: "₺26.200",
-                    bars: [
-                        { label: "Oca", h: "42%" }, { label: "Şub", h: "58%" }, { label: "Mar", h: "48%" },
-                        { label: "Nis", h: "72%" }, { label: "May", h: "64%" }, { label: "Haz", h: "86%" },
-                        { label: "Tem", h: "70%" }, { label: "Ağu", h: "60%" }, { label: "Eyl", h: "68%" },
-                        { label: "Eki", h: "75%" }, { label: "Kas", h: "80%" }, { label: "Ara", h: "85%" }
-                    ],
-                    categories: [
-                        { name: "Ofis & Genel Giderler", amount: "₺12.500", pct: 39 },
-                        { name: "Ulaşım & Lojistik", amount: "₺8.200", pct: 25 },
-                        { name: "Hizmet & Danışmanlık", amount: "₺6.800", pct: 21 },
-                        { name: "Diğer Giderler", amount: "₺4.500", pct: 15 }
-                    ]
-                },
-                monthlyTemplate: function (monthName) {
-                    return {
-                        title: `${monthName} 2026 (Haftalık Dağılım)`,
-                        cash: "₺" + (Math.floor(Math.random() * 20000) + 15000).toLocaleString('tr-TR'),
-                        vatSales: "₺" + (Math.floor(Math.random() * 4000) + 2000).toLocaleString('tr-TR'),
-                        vatBuy: "₺" + (Math.floor(Math.random() * 1000) + 500).toLocaleString('tr-TR'),
-                        vatNet: "₺" + (Math.floor(Math.random() * 3000) + 1500).toLocaleString('tr-TR'),
-                        bars: [
-                            { label: "1. Hafta", h: (Math.floor(Math.random() * 40) + 40) + "%" },
-                            { label: "2. Hafta", h: (Math.floor(Math.random() * 40) + 50) + "%" },
-                            { label: "3. Hafta", h: (Math.floor(Math.random() * 40) + 30) + "%" },
-                            { label: "4. Hafta", h: (Math.floor(Math.random() * 40) + 60) + "%" }
-                        ],
-                        categories: [
-                            { name: "Ofis & Genel Giderler", amount: "₺" + (Math.floor(Math.random() * 3000) + 1000), pct: 40 },
-                            { name: "Ulaşım & Lojistik", amount: "₺" + (Math.floor(Math.random() * 2000) + 800), pct: 25 },
-                            { name: "Hizmet & Danışmanlık", amount: "₺" + (Math.floor(Math.random() * 1500) + 500), pct: 20 },
-                            { name: "Diğer Giderler", amount: "₺" + (Math.floor(Math.random() * 1000) + 300), pct: 15 }
-                        ]
-                    };
-                }
-            };
+            function vatDeadline(period) {
+                const year = new Date().getFullYear();
+                let month = Number(period);
+                if (!month || month < 1 || month > 12) month = new Date().getMonth() + 1;
+                let nextMonth = month + 1, nextYear = year;
+                if (nextMonth > 12) { nextMonth = 1; nextYear += 1; }
+                return '26.' + String(nextMonth).padStart(2, '0') + '.' + nextYear;
+            }
 
-            function updateDashboard() {
-                const selectedPeriod = periodSelect.value;
-                const selectedPeriodText = periodSelect.options[periodSelect.selectedIndex].text;
-                const selectedType = typeSelect.options[typeSelect.selectedIndex].text;
+            async function updateDashboard() {
+                const period = periodSelect.value;
+                const selectedType = typeSelect.value;
+                const selectedTypeLabel = typeSelect.options[typeSelect.selectedIndex].text;
+                const periodLabel = periodSelect.options[periodSelect.selectedIndex].text;
 
                 let data;
-                if (selectedPeriod === 'all') {
-                    data = reportData.all;
-                } else {
-                    data = reportData.monthlyTemplate(selectedPeriodText.split(' ')[0]);
+                try {
+                    data = await apiFetch('/api/reports/summary?period=' + encodeURIComponent(period));
+                } catch (err) {
+                    showToast(err.message || 'Rapor verisi alınamadı', 'error');
+                    return;
                 }
 
-                document.getElementById('chart-title').innerText = `${selectedType} - ${data.title}`;
+                const granularityLabel = data.granularity === 'day' ? 'Günlük Dağılım' : 'Yıllık Görünüm';
+                document.getElementById('chart-title').innerText = `${selectedTypeLabel} - ${periodLabel} (${granularityLabel})`;
 
-         
-                document.getElementById('val-cash').innerText = data.cash;
-                document.getElementById('val-vat-sales').innerText = data.vatSales;
-                document.getElementById('val-vat-buy').innerText = data.vatBuy;
-                document.getElementById('val-vat-net').innerText = data.vatNet;
+                document.getElementById('val-cash').innerText = money(data.net);
+                const cashSub = document.getElementById('val-cash-sub');
+                cashSub.textContent = data.net >= 0 ? 'Nakit akışı pozitif' : 'Nakit akışı negatif';
+                cashSub.style.color = data.net >= 0 ? 'var(--success)' : 'var(--danger)';
+                document.getElementById('val-vat-sales').innerText = money(data.kdv_satis);
+                document.getElementById('val-vat-buy').innerText = money(data.kdv_alis);
+                document.getElementById('val-vat-net').innerText = money(data.kdv_net);
+                document.getElementById('val-vat-date').innerText = 'Tahmini son gün: ' + vatDeadline(period);
 
+                const valueOf = (bar) => selectedType === 'gider' ? bar.gider : selectedType === 'net' ? bar.net : bar.gelir;
                 const chartContainer = document.getElementById('chart-bars');
                 chartContainer.innerHTML = '';
-                data.bars.forEach(bar => {
-                    const barDiv = document.createElement('div');
-                    barDiv.className = 'bar';
-                    barDiv.style.height = bar.h;
-                    barDiv.innerHTML = `<span>${bar.label}</span>`;
-                    chartContainer.appendChild(barDiv);
-                });
+                if (!data.bars.length) {
+                    chartContainer.innerHTML = '<p class="muted" style="margin:auto;">Bu dönem için veri yok.</p>';
+                } else {
+                    const maxVal = Math.max(1, ...data.bars.map((b) => Math.abs(valueOf(b))));
+                    data.bars.forEach((bar) => {
+                        const barDiv = document.createElement('div');
+                        barDiv.className = 'bar';
+                        const h = Math.max(2, Math.round((Math.abs(valueOf(bar)) / maxVal) * 100));
+                        barDiv.style.height = h + '%';
+                        barDiv.title = money(valueOf(bar));
+                        barDiv.innerHTML = '<span></span>';
+                        barDiv.querySelector('span').textContent = bar.label;
+                        chartContainer.appendChild(barDiv);
+                    });
+                }
 
                 const categoryContainer = document.getElementById('category-container');
                 categoryContainer.innerHTML = '';
-                data.categories.forEach(cat => {
-                    const catDiv = document.createElement('div');
-                    catDiv.innerHTML = `
+                if (!data.categories.length) {
+                    categoryContainer.innerHTML = '<p class="muted">Bu dönemde gider kaydı yok.</p>';
+                } else {
+                    data.categories.forEach(cat => {
+                        const catDiv = document.createElement('div');
+                        catDiv.innerHTML = `
               <div style="display:flex; justify-content:space-between; font-size:13px; margin-bottom:6px;">
-                <span>${cat.name}</span>
-                <strong>${cat.amount} (%${cat.pct})</strong>
+                <span></span>
+                <strong></strong>
               </div>
-              <div class="progress"><span style="width: ${cat.pct}%;"></span></div>
+              <div class="progress"><span></span></div>
             `;
-                    categoryContainer.appendChild(catDiv);
-                });
+                        catDiv.querySelector('span').textContent = cat.kategori;
+                        catDiv.querySelector('strong').textContent = money(cat.tutar) + ' (%' + cat.pct + ')';
+                        catDiv.querySelector('.progress span').style.width = cat.pct + '%';
+                        categoryContainer.appendChild(catDiv);
+                    });
+                }
             }
 
             periodSelect.addEventListener('change', updateDashboard);

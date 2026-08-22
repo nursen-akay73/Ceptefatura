@@ -34,7 +34,7 @@
                 </div>
             </div>
 
-            <form class="card form-card" id="expense-form">
+            <form class="card form-card" id="form-new-expense">
                 <div class="form-grid">
                     <div class="form-group">
                         <label>Firma</label>
@@ -101,18 +101,109 @@
     <script src="../assets/js/script.js"></script>
     <script>
         document.addEventListener('DOMContentLoaded', function () {
-            const form = document.getElementById('expense-form');
-            const ocrFileInput = document.getElementById('ocr-file');
+            const tarihInput = document.getElementById('gider-tarih');
+            const firmaInput = document.getElementById('gider-firma');
+            const tutarInput = document.getElementById('gider-tutar');
+            const kdvInput = document.getElementById('gider-kdv');
+            const kaynakSelect = document.getElementById('gider-kaynak');
+            const aciklamaInput = document.getElementById('gider_aciklama');
+            const fileInput = document.getElementById('ocr-file');
+            const ocrStatus = document.getElementById('ocr-status');
+            const ocrProgress = document.getElementById('ocr-progress');
+            const dropzone = document.getElementById('ocr-dropzone');
+            let scannedFile = null;
 
-            form.addEventListener('submit', async function (e) {
+            tarihInput.value = new Date().toISOString().slice(0, 10);
+
+            function setProgress(on) {
+                if (ocrStatus) ocrStatus.style.display = on ? 'block' : 'none';
+                if (ocrProgress) ocrProgress.classList.toggle('is-active', !!on);
+            }
+
+            function clearOcrFields() {
+                firmaInput.value = '';
+                tutarInput.value = '';
+                kdvInput.value = '';
+                aciklamaInput.value = '';
+            }
+
+            function applyOcr(data) {
+                // Eski değerleri asla bırakma — yoksa ABC Ofis / 2450 gibi kalıntılar kalır
+                clearOcrFields();
+                firmaInput.value = data.firma || '';
+                if (data.tarih) tarihInput.value = data.tarih;
+                if (data.tutar != null && data.tutar !== '') tutarInput.value = data.tutar;
+                if (data.kdv != null && data.kdv !== '') kdvInput.value = data.kdv;
+                if (data.aciklama) aciklamaInput.value = data.aciklama;
+                kaynakSelect.value = 'OCR';
+
+                const missing = [];
+                if (!firmaInput.value) missing.push('firma');
+                if (!tutarInput.value) missing.push('tutar');
+                if (missing.length) {
+                    showToast('Kısmen okundu; eksik: ' + missing.join(', ') + '. Elle düzeltip kaydedin.', 'error');
+                } else {
+                    showToast('Fiş okundu — alanları kontrol edip kaydedin.');
+                }
+            }
+
+            async function scanFile(file) {
+                if (!file) return;
+                if (!/^image\/(jpeg|png|webp)$/i.test(file.type)) {
+                    showToast('OCR için JPG, PNG veya WEBP yükleyin', 'error');
+                    return;
+                }
+                scannedFile = file;
+                clearOcrFields();
+                setProgress(true);
+                try {
+                    const formData = new FormData();
+                    formData.append('fis', file);
+                    const data = await apiFetch('/api/expenses/scan', { method: 'POST', body: formData });
+                    applyOcr(data);
+                } catch (err) {
+                    showToast(err.message || 'Fiş okunamadı', 'error');
+                } finally {
+                    setProgress(false);
+                }
+            }
+
+            fileInput.addEventListener('change', () => {
+                const file = fileInput.files[0];
+                if (file) scanFile(file);
+            });
+
+            if (dropzone) {
+                dropzone.addEventListener('dragover', (e) => {
+                    e.preventDefault();
+                    dropzone.classList.add('dragover');
+                });
+                dropzone.addEventListener('dragleave', () => dropzone.classList.remove('dragover'));
+                dropzone.addEventListener('drop', (e) => {
+                    e.preventDefault();
+                    dropzone.classList.remove('dragover');
+                    const file = e.dataTransfer.files[0];
+                    if (!file) return;
+                    const dt = new DataTransfer();
+                    dt.items.add(file);
+                    fileInput.files = dt.files;
+                    scannedFile = file;
+                    scanFile(file);
+                });
+            }
+
+            document.getElementById('form-new-expense').addEventListener('submit', async function (e) {
                 e.preventDefault();
-
-                const tarih = document.getElementById('gider-tarih').value;
-                const tutar = document.getElementById('gider-tutar').value;
+                const tarih = tarihInput.value;
+                const tutar = tutarInput.value;
                 const kategori = document.getElementById('gider-kategori').value;
+                const kaynak = kaynakSelect.value;
+                const aciklama = aciklamaInput.value.trim();
+                const firma = firmaInput.value.trim();
+                const file = scannedFile || fileInput.files[0];
 
                 if (!tarih || tutar === '' || !kategori) {
-                    showToast('Tarih, tutar ve kategori zorunludur.', 'error');
+                    showToast('Tarih, tutar ve kategori zorunludur', 'error');
                     return;
                 }
 
@@ -120,32 +211,19 @@
                 formData.append('tarih', tarih);
                 formData.append('tutar', tutar);
                 formData.append('kategori', kategori);
-                formData.append('kaynak', document.getElementById('gider-kaynak').value);
-                formData.append('firma', document.getElementById('gider-firma').value || '');
-                formData.append('aciklama', document.getElementById('gider_aciklama').value || '');
-                if (ocrFileInput?.files?.[0]) {
-                    formData.append('fis', ocrFileInput.files[0]);
-                }
+                formData.append('kaynak', kaynak);
+                if (aciklama) formData.append('aciklama', aciklama);
+                if (firma) formData.append('firma', firma);
+                if (file) formData.append('fis', file);
 
-                const submitBtn = form.querySelector('button[type="submit"]');
+                const submitBtn = this.querySelector('button[type=submit]');
                 if (submitBtn) submitBtn.disabled = true;
-
                 try {
-                    const res = await authFetch('/api/expenses', { method: 'POST', body: formData });
-                    if (res.status === 401) {
-                        window.location.href = 'login.html';
-                        return;
-                    }
-                    const data = await res.json();
-                    if (!res.ok) {
-                        showToast(data.error || 'Gider oluşturulamadı', 'error');
-                        return;
-                    }
+                    await apiFetch('/api/expenses', { method: 'POST', body: formData });
                     showToast('Gider kaydedildi');
                     setTimeout(() => { window.location.href = 'expenses.html'; }, 600);
-                } catch {
-                    showToast('Sunucuya bağlanılamadı. npm run dev çalışıyor mu?', 'error');
-                } finally {
+                } catch (err) {
+                    showToast(err.message || 'Gider kaydedilemedi', 'error');
                     if (submitBtn) submitBtn.disabled = false;
                 }
             });

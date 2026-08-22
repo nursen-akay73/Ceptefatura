@@ -22,23 +22,20 @@
             <div class="grid stats">
                 <div class="card stat-card">
                     <span class="label">Toplam Nakit</span>
-                    <div class="value">₺125.000</div>
-                    <span class="change">↑ %8,4 geçen aya göre</span>
+                    <div class="value" id="stat-toplam-nakit">₺0</div>
                 </div>
                 <div class="card stat-card">
                     <span class="label">Bu Ay Gelir</span>
-                    <div class="value">₺85.000</div>
-                    <span class="change">↑ %12,1 geçen aya göre</span>
+                    <div class="value" id="stat-bu-ay-gelir">₺0</div>
                 </div>
                 <div class="card stat-card">
                     <span class="label">Bu Ay Gider</span>
-                    <div class="value">₺32.000</div>
-                    <span class="change">↓ %4,2 geçen aya göre</span>
+                    <div class="value" id="stat-bu-ay-gider">₺0</div>
                 </div>
                 <div class="card stat-card">
                     <span class="label">Bekleyen Tahsilat</span>
-                    <div class="value">₺18.500</div>
-                    <span class="change">5 fatura bekliyor</span>
+                    <div class="value" id="stat-bekleyen-tahsilat">₺0</div>
+                    <span class="change" id="stat-bekleyen-change">0 fatura bekliyor</span>
                 </div>
             </div>
             <br>
@@ -49,57 +46,8 @@
                         <h2>Aylık gelir ve gider</h2>
                         <a class="link" href="reports.html">Detaylı Rapor</a>
                     </div>
-                    <p class="cashflow-readout" data-cf-readout>Ağustos 2026 · Gelir ₺85.000 · Gider ₺32.000 · Net ₺53.000</p>
-                    <div class="cashflow" data-cashflow>
-                        <button type="button" class="cashflow-col" data-month="01" data-label="Ocak" data-gelir="48000" data-gider="31000">
-                            <span class="cashflow-bars"><span class="cashflow-bar gelir" style="--h:53%;--i:0"></span><span class="cashflow-bar gider" style="--h:34%;--i:0"></span></span>
-                            <span class="cashflow-label">Oca</span>
-                        </button>
-                        <button type="button" class="cashflow-col" data-month="02" data-label="Şubat" data-gelir="55000" data-gider="29000">
-                            <span class="cashflow-bars"><span class="cashflow-bar gelir" style="--h:61%;--i:1"></span><span class="cashflow-bar gider" style="--h:32%;--i:1"></span></span>
-                            <span class="cashflow-label">Şub</span>
-                        </button>
-                        <button type="button" class="cashflow-col" data-month="03" data-label="Mart" data-gelir="52000" data-gider="34000">
-                            <span class="cashflow-bars"><span class="cashflow-bar gelir" style="--h:58%;--i:2"></span><span class="cashflow-bar gider" style="--h:38%;--i:2"></span></span>
-                            <span class="cashflow-label">Mar</span>
-                        </button>
-                        <button type="button" class="cashflow-col" data-month="04" data-label="Nisan" data-gelir="68000" data-gider="36000">
-                            <span class="cashflow-bars"><span class="cashflow-bar gelir" style="--h:76%;--i:3"></span><span class="cashflow-bar gider" style="--h:40%;--i:3"></span></span>
-                            <span class="cashflow-label">Nis</span>
-                        </button>
-                        <button type="button" class="cashflow-col" data-month="05" data-label="Mayıs" data-gelir="61000" data-gider="33000">
-                            <span class="cashflow-bars"><span class="cashflow-bar gelir" style="--h:68%;--i:4"></span><span class="cashflow-bar gider" style="--h:37%;--i:4"></span></span>
-                            <span class="cashflow-label">May</span>
-                        </button>
-                        <button type="button" class="cashflow-col" data-month="06" data-label="Haziran" data-gelir="78000" data-gider="41000">
-                            <span class="cashflow-bars"><span class="cashflow-bar gelir" style="--h:87%;--i:5"></span><span class="cashflow-bar gider" style="--h:46%;--i:5"></span></span>
-                            <span class="cashflow-label">Haz</span>
-                        </button>
-                        <button type="button" class="cashflow-col" data-month="07" data-label="Temmuz" data-gelir="72000" data-gider="38000">
-                            <span class="cashflow-bars"><span class="cashflow-bar gelir" style="--h:80%;--i:6"></span><span class="cashflow-bar gider" style="--h:42%;--i:6"></span></span>
-                            <span class="cashflow-label">Tem</span>
-                        </button>
-                        <button type="button" class="cashflow-col is-current" data-month="08" data-label="Ağustos" data-gelir="85000" data-gider="32000">
-                            <span class="cashflow-bars"><span class="cashflow-bar gelir" style="--h:94%;--i:7"></span><span class="cashflow-bar gider" style="--h:36%;--i:7"></span></span>
-                            <span class="cashflow-label">Ağu</span>
-                        </button>
-                        <button type="button" class="cashflow-col" data-month="09" data-label="Eylül" data-gelir="64000" data-gider="35000">
-                            <span class="cashflow-bars"><span class="cashflow-bar gelir" style="--h:71%;--i:8"></span><span class="cashflow-bar gider" style="--h:39%;--i:8"></span></span>
-                            <span class="cashflow-label">Eyl</span>
-                        </button>
-                        <button type="button" class="cashflow-col" data-month="10" data-label="Ekim" data-gelir="70000" data-gider="37000">
-                            <span class="cashflow-bars"><span class="cashflow-bar gelir" style="--h:78%;--i:9"></span><span class="cashflow-bar gider" style="--h:41%;--i:9"></span></span>
-                            <span class="cashflow-label">Eki</span>
-                        </button>
-                        <button type="button" class="cashflow-col" data-month="11" data-label="Kasım" data-gelir="74000" data-gider="39000">
-                            <span class="cashflow-bars"><span class="cashflow-bar gelir" style="--h:82%;--i:10"></span><span class="cashflow-bar gider" style="--h:43%;--i:10"></span></span>
-                            <span class="cashflow-label">Kas</span>
-                        </button>
-                        <button type="button" class="cashflow-col" data-month="12" data-label="Aralık" data-gelir="80000" data-gider="42000">
-                            <span class="cashflow-bars"><span class="cashflow-bar gelir" style="--h:89%;--i:11"></span><span class="cashflow-bar gider" style="--h:47%;--i:11"></span></span>
-                            <span class="cashflow-label">Ara</span>
-                        </button>
-                    </div>
+                    <p class="cashflow-readout" data-cf-readout>Yükleniyor…</p>
+                    <div class="cashflow" data-cashflow></div>
                     <div class="cashflow-legend">
                         <span><i class="gelir"></i> Gelir</span>
                         <span><i class="gider"></i> Gider</span>
@@ -166,30 +114,11 @@
                                     <th>DURUM</th>
                                 </tr>
                             </thead>
-                            <tbody>
-                                <tr>
-                                    <td>INV-2026-001</td>
-                                    <td>ABC Teknoloji</td>
-                                    <td>03.08.2026</td>
-                                    <td class="money">₺12.500,00</td>
-                                    <td><span class="badge success">Ödendi</span></td>
-                                </tr>
-                                <tr>
-                                    <td>INV-2026-002</td>
-                                    <td>XYZ Danışmanlık</td>
-                                    <td>01.08.2026</td>
-                                    <td class="money">₺8.750,00</td>
-                                    <td><span class="badge warning">Bekliyor</span></td>
-                                </tr>
-                                <tr>
-                                    <td>INV-2026-003</td>
-                                    <td>Beta Lojistik</td>
-                                    <td>28.07.2026</td>
-                                    <td class="money">₺5.400,00</td>
-                                    <td><span class="badge danger">Gecikti</span></td>
-                                </tr>
-                            </tbody>
+                            <tbody id="recent-invoice-body"></tbody>
                         </table>
+                    </div>
+                    <div class="empty-state" data-empty-for="#recent-invoice-body">
+                        <p data-empty-none>Henüz fatura yok.</p>
                     </div>
                 </div>
 
@@ -197,16 +126,86 @@
                     <div class="card-header">
                         <h2>Yaklaşan Ödemeler</h2>
                     </div>
-                    <p><strong>XYZ Danışmanlık</strong><br><span class="muted">Vade: 10.08.2026</span></p>
-                    <div class="progress"><span style="width: 70%;"></span></div>
-                    <br>
-                    <p><strong>Beta Lojistik</strong><br><span class="muted">Vade: 15.08.2026</span></p>
-                    <div class="progress"><span style="width: 40%;"></span></div>
+                    <div id="upcoming-payments"><p class="muted">Yükleniyor…</p></div>
                 </div>
             </div>
 
         </main>
     </div>
     <script src="../assets/js/script.js"></script>
+    <script>
+        document.addEventListener('DOMContentLoaded', async function () {
+            const money = (n) => '₺' + Number(n || 0).toLocaleString('tr-TR', { minimumFractionDigits: 0 });
+            const dateTr = (d) => d ? new Date(d).toLocaleDateString('tr-TR') : '—';
+
+            try {
+                const data = await apiFetch('/api/reports/dashboard');
+
+                document.getElementById('stat-toplam-nakit').textContent = money(data.toplam_nakit);
+                document.getElementById('stat-bu-ay-gelir').textContent = money(data.bu_ay_gelir);
+                document.getElementById('stat-bu-ay-gider').textContent = money(data.bu_ay_gider);
+                document.getElementById('stat-bekleyen-tahsilat').textContent = money(data.bekleyen_tahsilat);
+                document.getElementById('stat-bekleyen-change').textContent = data.bekleyen_fatura_sayisi + ' fatura bekliyor';
+
+                const chart = document.querySelector('[data-cashflow]');
+                const currentMonth = String(new Date().getMonth() + 1).padStart(2, '0');
+                const maxVal = Math.max(1, ...data.cashflow.map((m) => Math.max(m.gelir, m.gider)));
+                chart.innerHTML = '';
+                data.cashflow.forEach((m, i) => {
+                    const btn = document.createElement('button');
+                    btn.type = 'button';
+                    btn.className = 'cashflow-col' + (m.month === currentMonth ? ' is-current' : '');
+                    btn.dataset.month = m.month;
+                    btn.dataset.label = m.label;
+                    btn.dataset.gelir = m.gelir;
+                    btn.dataset.gider = m.gider;
+                    const gelirH = Math.round((m.gelir / maxVal) * 100);
+                    const giderH = Math.round((m.gider / maxVal) * 100);
+                    btn.innerHTML = `
+              <span class="cashflow-bars"><span class="cashflow-bar gelir" style="--h:${gelirH}%;--i:${i}"></span><span class="cashflow-bar gider" style="--h:${giderH}%;--i:${i}"></span></span>
+              <span class="cashflow-label"></span>
+            `;
+                    btn.querySelector('.cashflow-label').textContent = m.label.slice(0, 3);
+                    chart.appendChild(btn);
+                });
+                if (typeof initCashflowChart === 'function') initCashflowChart();
+
+                const invoiceBody = document.getElementById('recent-invoice-body');
+                data.son_faturalar.forEach((inv) => {
+                    const badgeClass = inv.durum === 'Ödendi' ? 'success' : inv.durum === 'Gecikti' ? 'danger' : 'warning';
+                    const tr = document.createElement('tr');
+                    tr.innerHTML = `<td></td><td></td><td></td><td class="money"></td><td><span class="badge ${badgeClass}"></span></td>`;
+                    tr.children[0].textContent = inv.fatura_no;
+                    tr.children[1].textContent = inv.cari;
+                    tr.children[2].textContent = dateTr(inv.kesim_tarihi);
+                    tr.querySelector('.money').textContent = money(inv.tutar);
+                    tr.querySelector('.badge').textContent = inv.durum;
+                    invoiceBody.appendChild(tr);
+                });
+                syncEmptyStates();
+
+                const upcoming = document.getElementById('upcoming-payments');
+                upcoming.innerHTML = '';
+                if (!data.yaklasan_odemeler.length) {
+                    upcoming.innerHTML = '<p class="muted">Yaklaşan ödeme yok.</p>';
+                } else {
+                    data.yaklasan_odemeler.forEach((o) => {
+                        const wrap = document.createElement('div');
+                        wrap.innerHTML = `
+              <p><strong></strong><br><span class="muted">Vade: </span></p>
+              <div class="progress"><span></span></div>
+              <br>
+            `;
+                        wrap.querySelector('strong').textContent = o.cari_adi;
+                        wrap.querySelector('.muted').textContent = 'Vade: ' + dateTr(o.vade_tarihi);
+                        wrap.querySelector('.progress span').style.width = o.ilerleme_yuzde + '%';
+                        upcoming.appendChild(wrap);
+                    });
+                }
+            } catch (err) {
+                showToast(err.message || 'Panel verileri alınamadı', 'error');
+            }
+        });
+    </script>
 </body>
 </html>

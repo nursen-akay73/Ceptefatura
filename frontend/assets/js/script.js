@@ -67,15 +67,6 @@
 document.addEventListener("DOMContentLoaded", () => {
   const page = document.body.dataset.page;
 
-  const PROTECTED_PAGES = [
-    "dashboard", "accounts", "invoices", "invoice-new", "invoice-template",
-    "expenses", "expense-new", "reports", "settings", "accountant",
-  ];
-  if (PROTECTED_PAGES.includes(page) && !localStorage.getItem("token")) {
-    window.location.href = "login.html";
-    return;
-  }
-
   if (!document.querySelector(".sidebar-overlay")) {
     const overlay = document.createElement("div");
     overlay.className = "sidebar-overlay";
@@ -120,6 +111,25 @@ document.addEventListener("DOMContentLoaded", () => {
           clearSession();
           window.location.href = "login.html";
         });
+
+        const notifMenu = document.getElementById("notif-menu");
+        if (notifMenu && localStorage.getItem("token")) {
+          document.getElementById("notif-bell")?.addEventListener("click", (e) => {
+            e.stopPropagation();
+            const opening = !notifMenu.classList.contains("open");
+            notifMenu.classList.toggle("open", opening);
+            if (opening) loadNotifList();
+          });
+          // Dropdown içindeki tıklamalar dışarı taşıp paneli erken kapatmasın.
+          document.getElementById("notif-dropdown")?.addEventListener("click", (e) => e.stopPropagation());
+          document.addEventListener("click", () => notifMenu.classList.remove("open"));
+          document.getElementById("notif-mark-all")?.addEventListener("click", async () => {
+            await markAllNotificationsRead();
+          });
+          initNotifBell();
+        } else if (notifMenu) {
+          notifMenu.hidden = true;
+        }
       }
     });
 
@@ -176,6 +186,18 @@ document.addEventListener("DOMContentLoaded", () => {
     showToast("Şifre sıfırlama bağlantısı e-postanıza gönderildi");
   });
 
+  document.querySelectorAll("[data-password-toggle]").forEach((btn) => {
+    btn.addEventListener("click", () => {
+      const input = btn.closest(".input-password")?.querySelector("input");
+      if (!input) return;
+      const show = input.type === "password";
+      input.type = show ? "text" : "password";
+      btn.classList.toggle("is-visible", show);
+      btn.setAttribute("aria-label", show ? "Şifreyi gizle" : "Şifreyi göster");
+      btn.title = show ? "Şifreyi gizle" : "Şifreyi göster";
+    });
+  });
+
   document.querySelectorAll("[data-auth-form]").forEach((form) => {
     form.addEventListener("submit", async (e) => {
       e.preventDefault();
@@ -196,7 +218,10 @@ document.addEventListener("DOMContentLoaded", () => {
           return;
         }
         if (data.token) localStorage.setItem("token", data.token);
-        if (data.user) saveSessionUser(data.user);
+        if (data.user) {
+          saveSessionUser(data.user);
+          if (data.user.activeBusinessId) setActiveBusinessId(data.user.activeBusinessId);
+        }
         if (mode === "login") {
           try {
             if (remember?.checked && body.email) localStorage.setItem("cf_email", body.email);
@@ -330,10 +355,14 @@ document.addEventListener("DOMContentLoaded", () => {
     const btn = e.target.closest(".js-switch-company");
     if (!btn) return;
     e.preventDefault();
+    const businessId = btn.dataset.businessId
+      || btn.closest("tr")?.dataset.businessId
+      || document.getElementById("companyModal")?.dataset.businessId;
     const name = btn.dataset.company
       || btn.closest("tr")?.querySelector("strong")?.textContent.trim()
       || document.getElementById("m-isletme-adi")?.textContent.trim();
-    if (!name) return;
+    if (!businessId || !name) return;
+    setActiveBusinessId(businessId);
     try { sessionStorage.setItem("cf_company", name); } catch {}
     showToast(name + " hesabına geçildi");
     setTimeout(() => { window.location.href = "dashboard.html"; }, 450);
@@ -380,26 +409,6 @@ document.addEventListener("DOMContentLoaded", () => {
     el.addEventListener("change", () => setTimeout(syncEmptyStates, 0));
     el.addEventListener("click", () => setTimeout(syncEmptyStates, 0));
   });
-  const expenseBody = document.getElementById("expense-table-body");
-  if (expenseBody) {
-    const card = expenseBody.closest(".card");
-    const search = card?.querySelector(".filter-row input");
-    const category = card?.querySelector(".filter-row select");
-    const applyExpenseFilter = () => {
-      const q = (search?.value || "").toLowerCase().trim();
-      const cat = category?.value || "";
-      expenseBody.querySelectorAll("tr").forEach((row) => {
-        const text = row.innerText.toLowerCase();
-        const matchesSearch = !q || text.includes(q);
-        const matchesCat = !cat || cat === "Tüm Kategoriler" || row.cells[2]?.innerText === cat;
-        row.style.display = matchesSearch && matchesCat ? "" : "none";
-      });
-      syncEmptyStates();
-    };
-    search?.addEventListener("input", applyExpenseFilter);
-    category?.addEventListener("change", applyExpenseFilter);
-  }
-
   syncEmptyStates();
 
   if (page === "dashboard") initCashflowChart();
@@ -487,6 +496,8 @@ function saveSessionUser(user) {
       ad_soyad: user.ad_soyad,
       isletme_adi: user.isletme_adi,
       email: user.email,
+      businesses: user.businesses || [],
+      activeBusinessId: user.activeBusinessId || null,
     }));
   } catch {}
 }
@@ -495,15 +506,45 @@ function clearSession() {
   try {
     localStorage.removeItem("token");
     localStorage.removeItem("cf_user");
+    localStorage.removeItem("cf_business_id");
     sessionStorage.removeItem("cf_company");
   } catch {}
 }
 
-function authFetch(url, options = {}) {
+function activeBusinessId() {
+  try { return localStorage.getItem("cf_business_id") || ""; } catch { return ""; }
+}
+
+function setActiveBusinessId(id) {
+  try {
+    if (id) localStorage.setItem("cf_business_id", id);
+    else localStorage.removeItem("cf_business_id");
+  } catch {}
+}
+
+async function apiFetch(path, opts = {}) {
   const token = localStorage.getItem("token");
-  const headers = { ...(options.headers || {}) };
+  const headers = { ...(opts.headers || {}) };
   if (token) headers.Authorization = "Bearer " + token;
-  return fetch(url, { ...options, headers });
+  const bizId = activeBusinessId();
+  if (bizId) headers["X-Business-Id"] = bizId;
+  if (opts.body && !(opts.body instanceof FormData) && typeof opts.body !== "string") {
+    headers["Content-Type"] = "application/json";
+    opts = { ...opts, body: JSON.stringify(opts.body) };
+  } else if (opts.body && typeof opts.body === "string") {
+    headers["Content-Type"] = "application/json";
+  }
+
+  const res = await fetch(path, { ...opts, headers });
+  let data = null;
+  try { data = await res.json(); } catch {}
+  if (!res.ok) {
+    const err = new Error((data && data.error) || "İstek başarısız");
+    err.status = res.status;
+    err.data = data;
+    throw err;
+  }
+  return data;
 }
 
 function userInitial(name) {
@@ -514,7 +555,10 @@ function userInitial(name) {
 function paintUserMenu(user) {
   const full = (user && user.ad_soyad) || "Nurşen";
   const first = full.trim().split(/\s+/)[0] || "Nurşen";
-  const role = sessionStorage.getItem("cf_company") ? "Mali Müşavir" : "İşletme Yöneticisi";
+  const businesses = (user && user.businesses) || [];
+  const activeId = activeBusinessId() || (user && user.activeBusinessId) || "";
+  const active = businesses.find((b) => b.id === activeId) || businesses[0];
+  const role = active && active.role === "musavir" ? "Mali Müşavir" : "İşletme Yöneticisi";
   const nameEl = document.getElementById("user-name");
   const roleEl = document.getElementById("user-role");
   const avatar = document.getElementById("user-avatar");
@@ -531,12 +575,12 @@ async function applyUserMenu() {
   const token = localStorage.getItem("token");
   if (!token) return;
   try {
-    const res = await fetch("/api/auth/me", {
-      headers: { Authorization: "Bearer " + token },
-    });
-    if (!res.ok) return;
-    const data = await res.json();
+    const data = await apiFetch("/api/auth/me");
     if (data && data.ad_soyad) {
+      const list = data.businesses || [];
+      const current = activeBusinessId();
+      const stillValid = current && list.some((b) => b.id === current);
+      if (!stillValid && data.activeBusinessId) setActiveBusinessId(data.activeBusinessId);
       saveSessionUser(data);
       paintUserMenu(data);
       fillSettingsUser(data);
@@ -544,23 +588,152 @@ async function applyUserMenu() {
   } catch {}
 }
 
+/* --- Bildirim zili: vadesi yaklaşan/geçen faturalar için otomatik hatırlatmalar --- */
+let _notifPollHandle = null;
+
+function dateTrShort(d) {
+  return d ? new Date(d).toLocaleDateString("tr-TR") : "";
+}
+
+function paintNotifBadge(count) {
+  const badge = document.getElementById("notif-badge");
+  if (!badge) return;
+  if (!count) {
+    badge.hidden = true;
+    badge.textContent = "0";
+  } else {
+    badge.hidden = false;
+    badge.textContent = count > 9 ? "9+" : String(count);
+  }
+}
+
+async function loadNotifUnreadCount() {
+  try {
+    const data = await apiFetch("/api/notifications/unread-count");
+    paintNotifBadge(data.count || 0);
+  } catch {}
+}
+
+async function loadNotifList() {
+  const list = document.getElementById("notif-list");
+  if (!list) return;
+  list.innerHTML = '<p class="muted notif-empty">Yükleniyor…</p>';
+  try {
+    // Panel her açıldığında güncel veriyle taransın (arka plan zamanlayıcısını beklemeden).
+    await apiFetch("/api/notifications/sweep", { method: "POST" }).catch(() => {});
+    const items = await apiFetch("/api/notifications");
+    renderNotifList(items || []);
+    const unread = (items || []).filter((n) => n.durum === "okunmadi").length;
+    paintNotifBadge(unread);
+  } catch (err) {
+    list.innerHTML = `<p class="muted notif-empty">Bildirimler alınamadı.</p>`;
+  }
+}
+
+function renderNotifList(items) {
+  const list = document.getElementById("notif-list");
+  if (!list) return;
+  list.innerHTML = "";
+  if (!items.length) {
+    list.innerHTML = '<p class="muted notif-empty">Bildiriminiz yok.</p>';
+    return;
+  }
+  items.forEach((n) => {
+    const btn = document.createElement("button");
+    btn.type = "button";
+    btn.className = "notif-item" + (n.durum === "okunmadi" ? " is-unread" : "");
+    btn.dataset.id = n.id;
+    btn.innerHTML = `
+      <span class="notif-item-top"><span class="notif-item-dot"></span><span class="notif-item-msg"></span></span>
+      <span class="notif-item-time"></span>`;
+    btn.querySelector(".notif-item-msg").textContent = n.mesaj;
+    btn.querySelector(".notif-item-time").textContent = dateTrShort(n.created_at);
+    btn.addEventListener("click", async () => {
+      if (n.durum === "okunmadi") {
+        await markNotificationRead(n.id);
+        btn.classList.remove("is-unread");
+      }
+      window.location.href = "invoices.html";
+    });
+    list.appendChild(btn);
+  });
+}
+
+async function markNotificationRead(id) {
+  try {
+    await apiFetch(`/api/notifications/${id}/read`, { method: "POST" });
+    loadNotifUnreadCount();
+  } catch {}
+}
+
+async function markAllNotificationsRead() {
+  try {
+    await apiFetch("/api/notifications/read-all", { method: "POST" });
+    document.querySelectorAll(".notif-item.is-unread").forEach((el) => el.classList.remove("is-unread"));
+    paintNotifBadge(0);
+  } catch {}
+}
+
+function initNotifBell() {
+  loadNotifUnreadCount();
+  if (_notifPollHandle) clearInterval(_notifPollHandle);
+  // Sayfa açık kaldığı sürece rozet düzenli tazelensin.
+  _notifPollHandle = setInterval(loadNotifUnreadCount, 60000);
+}
+
 function fillSettingsUser(user) {
   if (!user || document.body.dataset.page !== "settings") return;
   const name = document.getElementById("set-ad-soyad");
   const email = document.getElementById("set-email");
-  const company = document.getElementById("set-isletme");
-  const mailFirma = document.getElementById("set-firma-email");
   if (name && !name.dataset.dirty) name.value = user.ad_soyad || "";
   if (email && !email.dataset.dirty) email.value = user.email || "";
-  if (company && !company.dataset.dirty) company.value = user.isletme_adi || company.value;
-  if (mailFirma && user.email && mailFirma.value === "info@ceptefatura.com") {
-    mailFirma.value = user.email;
+}
+
+const FIRMA_PROFIL_FIELDS = {
+  "set-isletme": "isletme_adi",
+  "set-vergi-no": "vergi_no",
+  "set-vergi-dairesi": "vergi_dairesi",
+  "set-firma-telefon": "telefon",
+  "set-firma-email": "email",
+  "set-firma-sehir": "sehir",
+  "set-firma-adres": "adres",
+};
+
+async function loadFirmaProfil() {
+  const form = document.getElementById("form-firma-profil");
+  if (!form) return;
+  const businessId = activeBusinessId();
+  if (!businessId) return;
+
+  try {
+    const list = await apiFetch("/api/businesses");
+    const biz = list.find((b) => b.id === businessId) || list[0];
+    if (!biz) return;
+
+    form.dataset.businessId = biz.id;
+    Object.entries(FIRMA_PROFIL_FIELDS).forEach(([id, key]) => {
+      const el = document.getElementById(id);
+      if (el && !el.dataset.dirty) el.value = biz[key] || "";
+    });
+
+    const readOnly = biz.role !== "sahip";
+    const note = document.getElementById("firma-profil-readonly-note");
+    if (note) note.hidden = !readOnly;
+    Object.keys(FIRMA_PROFIL_FIELDS).forEach((id) => {
+      const el = document.getElementById(id);
+      if (el) el.disabled = readOnly;
+    });
+    const submitBtn = form.querySelector("button[type=submit]");
+    if (submitBtn) submitBtn.disabled = readOnly;
+  } catch (err) {
+    showToast(err.message || "Firma bilgileri alınamadı", "error");
   }
 }
 
 function initSettingsPage() {
   const user = getSessionUser();
   fillSettingsUser(user);
+  loadFirmaProfil();
 
   const hash = (location.hash || "").replace("#", "");
   if (hash) {
@@ -597,6 +770,41 @@ function initSettingsPage() {
     showToast("Bildirim tercihleri kaydedildi");
   });
 
+  document.getElementById("form-firma-profil")?.addEventListener("submit", async (e) => {
+    e.preventDefault();
+    const form = e.target;
+    const businessId = form.dataset.businessId || activeBusinessId();
+    if (!businessId) {
+      showToast("Aktif işletme bulunamadı", "error");
+      return;
+    }
+    const isletmeAdi = document.getElementById("set-isletme")?.value.trim();
+    if (!isletmeAdi) {
+      showToast("İşletme unvanı zorunlu", "error");
+      return;
+    }
+    const body = { isletme_adi: isletmeAdi };
+    Object.entries(FIRMA_PROFIL_FIELDS).forEach(([id, key]) => {
+      if (key === "isletme_adi") return;
+      body[key] = document.getElementById(id)?.value.trim() || null;
+    });
+
+    const submitBtn = form.querySelector("button[type=submit]");
+    if (submitBtn) submitBtn.disabled = true;
+    try {
+      await apiFetch("/api/businesses/" + businessId, { method: "PATCH", body });
+      Object.keys(FIRMA_PROFIL_FIELDS).forEach((id) => {
+        const el = document.getElementById(id);
+        if (el) delete el.dataset.dirty;
+      });
+      showToast("Firma profili kaydedildi");
+    } catch (err) {
+      showToast(err.message || "Firma profili kaydedilemedi", "error");
+    } finally {
+      if (submitBtn) submitBtn.disabled = false;
+    }
+  });
+
   document.getElementById("btn-invite-accountant")?.addEventListener("click", () => {
     const mail = document.getElementById("set-invite-email")?.value.trim();
     if (!mail) {
@@ -606,7 +814,7 @@ function initSettingsPage() {
     showToast("Davet e-postası gönderildi");
   });
 
-  ["set-ad-soyad", "set-email", "set-isletme"].forEach((id) => {
+  ["set-ad-soyad", "set-email", ...Object.keys(FIRMA_PROFIL_FIELDS)].forEach((id) => {
     document.getElementById(id)?.addEventListener("input", (e) => {
       e.target.dataset.dirty = "1";
     });
@@ -617,16 +825,25 @@ function applyCompanyContext() {
   let name = "";
   try { name = sessionStorage.getItem("cf_company") || ""; } catch {}
   if (!name || document.body.classList.contains("auth-page")) return;
-  if (document.querySelector(".context-banner")) return;
+  document.querySelector(".context-banner")?.remove();
   const bar = document.createElement("div");
   bar.className = "context-banner";
-  bar.innerHTML = `<span><strong>${name}</strong> adına işlem yapıyorsunuz</span><button type="button" id="exit-firm-context">Kendi hesabıma dön</button>`;
+  bar.setAttribute("role", "status");
+  bar.innerHTML = `
+    <div class="context-banner-main">
+      <span class="context-banner-badge">Aktif işletme</span>
+      <p class="context-banner-text"><strong>${escapeHtml(name)}</strong> adına işlem yapıyorsunuz</p>
+    </div>
+    <button type="button" id="exit-firm-context">Kendi hesabıma dön</button>`;
   const header = document.getElementById("header-container");
   if (header) header.insertAdjacentElement("afterend", bar);
   else document.querySelector(".main")?.prepend(bar);
+  document.body.classList.add("has-firm-context");
   document.getElementById("exit-firm-context")?.addEventListener("click", () => {
     try { sessionStorage.removeItem("cf_company"); } catch {}
+    setActiveBusinessId(null);
     bar.remove();
+    document.body.classList.remove("has-firm-context");
     showToast("Kendi hesabınıza döndünüz");
   });
 }
@@ -692,68 +909,196 @@ function showToast(message, type = "success") {
   setTimeout(() => el.remove(), 4000);
 }
 
-function startSpeechToText(inputEl, micBtn, onEnd) {
+let _activeSpeechRecognition = null;
+let _activeMicStream = null;
+
+function stopMicStream() {
+  if (_activeMicStream) {
+    _activeMicStream.getTracks().forEach((t) => t.stop());
+    _activeMicStream = null;
+  }
+}
+
+async function startSpeechToText(inputEl, micBtn, onEnd) {
   const SpeechRecognitionImpl = window.SpeechRecognition || window.webkitSpeechRecognition;
   if (!SpeechRecognitionImpl) {
-    showToast("Tarayıcınız sesle yazmayı desteklemiyor. Chrome veya Edge'de deneyin.", "error");
+    showToast("Ses tanıma bu tarayıcıda yok. Chrome kullanın.", "error");
     return;
   }
 
-  const wrap = micBtn.closest(".input-mic");
-  const recognition = new SpeechRecognitionImpl();
-  recognition.lang = "tr-TR";
-  recognition.interimResults = true;
-  recognition.maxAlternatives = 1;
+  // İkinci tık = bitir
+  if (_activeSpeechRecognition) {
+    try {
+      _activeSpeechRecognition.stop();
+    } catch {}
+    return;
+  }
 
-  micBtn.disabled = true;
-  micBtn.classList.add("mic-listening");
-  wrap?.classList.add("listening");
+  if (window.speechSynthesis) window.speechSynthesis.cancel();
+
+  const wrap = micBtn.closest(".input-mic") || micBtn.closest(".cf-asst-form");
   const originalTitle = micBtn.title;
   const originalPlaceholder = inputEl.placeholder;
-  const baseValue = inputEl.value.trim();
-  micBtn.title = "Dinleniyor...";
-  inputEl.placeholder = "Dinleniyor...";
+
+  let finalTranscript = "";
+  let interimTranscript = "";
+  let finished = false;
+  let watchTimer = null;
+  let levelTimer = null;
+
+  function paintInput() {
+    const text = [finalTranscript, interimTranscript].filter(Boolean).join(" ").trim();
+    inputEl.value = text;
+  }
+
+  function cleanupUi() {
+    micBtn.classList.remove("mic-listening");
+    micBtn.setAttribute("aria-pressed", "false");
+    wrap?.classList.remove("listening");
+    micBtn.title = originalTitle;
+    inputEl.placeholder = originalPlaceholder || "Sorunuzu yazın veya konuşun...";
+    micBtn.style.removeProperty("--mic-level");
+    if (watchTimer) clearTimeout(watchTimer);
+    if (levelTimer) clearInterval(levelTimer);
+    watchTimer = null;
+    levelTimer = null;
+    _activeSpeechRecognition = null;
+    stopMicStream();
+  }
+
+  function finish() {
+    if (finished) return;
+    finished = true;
+    try {
+      if (_activeSpeechRecognition) _activeSpeechRecognition.stop();
+    } catch {}
+    const spoken = (finalTranscript || interimTranscript || inputEl.value || "").trim();
+    cleanupUi();
+    if (spoken) {
+      inputEl.value = spoken;
+      if (typeof onEnd === "function") onEnd(spoken);
+    } else {
+      showToast("Metin algılanamadı. Yazıp Gönder’e basabilir veya tekrar deneyin.", "error");
+    }
+  }
+
+  // 1) Önce gerçek mikrofon erişimi — tanıma çoğu zaman bundan sonra çalışır
+  try {
+    if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+      showToast("Mikrofon API’si yok. HTTPS veya localhost + Chrome gerekli.", "error");
+      return;
+    }
+    _activeMicStream = await navigator.mediaDevices.getUserMedia({
+      audio: { echoCancellation: true, noiseSuppression: true },
+    });
+  } catch (err) {
+    showToast("Mikrofon izni gerekli. Adres çubuğundan izin verin.", "error");
+    return;
+  }
+
+  // Ses seviyesi göstergesi (mik gerçekten çalışıyor mu?)
+  try {
+    const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+    const source = audioCtx.createMediaStreamSource(_activeMicStream);
+    const analyser = audioCtx.createAnalyser();
+    analyser.fftSize = 256;
+    source.connect(analyser);
+    const data = new Uint8Array(analyser.frequencyBinCount);
+    levelTimer = setInterval(() => {
+      analyser.getByteFrequencyData(data);
+      let sum = 0;
+      for (let i = 0; i < data.length; i++) sum += data[i];
+      const avg = sum / data.length / 255;
+      micBtn.style.setProperty("--mic-level", String(Math.min(1, avg * 3)));
+      if (avg > 0.05) inputEl.placeholder = "Sizi duyuyorum… konuşmaya devam";
+    }, 100);
+    micBtn._audioCtx = audioCtx;
+  } catch {}
+
+  const recognition = new SpeechRecognitionImpl();
+  _activeSpeechRecognition = recognition;
+  recognition.lang = "tr-TR";
+  recognition.interimResults = true;
+  recognition.continuous = false;
+  recognition.maxAlternatives = 1;
+
+  micBtn.classList.add("mic-listening");
+  micBtn.setAttribute("aria-pressed", "true");
+  wrap?.classList.add("listening");
+  micBtn.title = "Dinleniyor… Bitirmek için tekrar tıklayın";
+  inputEl.placeholder = "Şimdi net konuşun…";
+  inputEl.value = "";
+  showToast("Mikrofon açık — şimdi konuşun (örn. yeni fatura aç)");
 
   recognition.onresult = (event) => {
-    let finalText = "";
-    let interimText = "";
-    for (let i = 0; i < event.results.length; i += 1) {
-      const piece = event.results[i][0].transcript.trim();
-      if (event.results[i].isFinal) finalText += (finalText ? " " : "") + piece;
-      else interimText += (interimText ? " " : "") + piece;
+    interimTranscript = "";
+    for (let i = event.resultIndex; i < event.results.length; i++) {
+      const piece = (event.results[i][0].transcript || "").trim();
+      if (!piece) continue;
+      if (event.results[i].isFinal) finalTranscript = (finalTranscript + " " + piece).trim();
+      else interimTranscript = piece;
     }
-    const parts = [baseValue, finalText, interimText].filter(Boolean);
-    inputEl.value = parts.join(" ");
-    inputEl.dispatchEvent(new Event("input", { bubbles: true }));
-    inputEl.focus();
+    paintInput();
+    // Final parça geldiyse hemen işle
+    if (finalTranscript) {
+      setTimeout(() => finish(), 150);
+    }
   };
 
   recognition.onerror = (event) => {
-    if (event.error === "not-allowed" || event.error === "service-not-allowed") {
-      showToast("Mikrofon izni reddedildi. Tarayıcı site ayarlarından mikrofona izin verin.", "error");
-    } else if (event.error === "audio-capture") {
-      showToast("Mikrofon bulunamadı. Bilgisayarınızda bir mikrofon bağlı/seçili olduğundan ve Windows gizlilik ayarlarında tarayıcının mikrofon erişimine izin verildiğinden emin olun.", "error");
-    } else if (event.error === "network") {
-      showToast("Ses tanıma servisine ulaşılamadı. İnternet bağlantınızı kontrol edin.", "error");
-    } else if (event.error !== "aborted" && event.error !== "no-speech") {
-      showToast("Ses tanıma hatası: " + event.error, "error");
+    const err = event.error;
+    if (err === "aborted") return;
+    if (err === "not-allowed" || err === "service-not-allowed") {
+      finished = true;
+      cleanupUi();
+      showToast("Mikrofon engelli. Chrome ayarlarından izin verin.", "error");
+      return;
     }
+    if (err === "network") {
+      finished = true;
+      cleanupUi();
+      showToast("Ses tanıma internet ister. Bağlantıyı kontrol edin.", "error");
+      return;
+    }
+    if (err === "no-speech") {
+      // Bir tur daha dene
+      try {
+        recognition.start();
+        return;
+      } catch {
+        finish();
+      }
+      return;
+    }
+    showToast("Ses hatası: " + err, "error");
+    finish();
   };
 
   recognition.onend = () => {
-    micBtn.disabled = false;
-    micBtn.classList.remove("mic-listening");
-    wrap?.classList.remove("listening");
-    micBtn.title = originalTitle;
-    inputEl.placeholder = originalPlaceholder || "Konuşun, faturaya yazılsın...";
-    if (typeof onEnd === "function") onEnd(inputEl.value);
+    if (finished) return;
+    if (finalTranscript || interimTranscript) {
+      finish();
+      return;
+    }
+    // Tek yeniden deneme
+    if (!recognition._retried) {
+      recognition._retried = true;
+      try {
+        recognition.start();
+        return;
+      } catch {}
+    }
+    finish();
   };
+
+  watchTimer = setTimeout(() => finish(), 10000);
 
   try {
     recognition.start();
-  } catch {
-    micBtn.disabled = false;
-    micBtn.classList.remove("mic-listening");
+  } catch (e) {
+    finished = true;
+    cleanupUi();
+    showToast("Ses tanıma başlatılamadı.", "error");
   }
 }
 
@@ -1009,10 +1354,93 @@ const CF_ASSISTANT_KB = [
   },
 ];
 
+function resolveVoiceCommand(message) {
+  const q = foldTr(message);
+  if (!q) return null;
+
+  const rules = [
+    {
+      test: /(yeni\s*fatura|fatura\s*kes|fatura\s*olustur|fatura\s*ac)/,
+      href: "invoice-new.html",
+      label: "Yeni Fatura",
+      text: "Yeni fatura sayfasını açıyorum.",
+    },
+    {
+      test: /(otomatik\s*fatura|tekrarlayan|sablon)/,
+      href: "invoice-template.html",
+      label: "Otomatik Fatura",
+      text: "Otomatik fatura şablonuna gidiyorum.",
+    },
+    {
+      test: /(faturalar|fatura\s*listesi|faturalara\s*(git|ac|goster))/,
+      href: "invoices.html",
+      label: "Faturalar",
+      text: "Faturalar listesini açıyorum.",
+    },
+    {
+      test: /(yeni\s*gider|gider\s*(ekle|kaydet|ac)|fis\s*(yukle|tara|ac)|ocr)/,
+      href: "expense-new.html",
+      label: "Yeni Gider",
+      text: "Yeni gider / fiş yükleme sayfasını açıyorum.",
+    },
+    {
+      test: /(giderler|gider\s*listesi)/,
+      href: "expenses.html",
+      label: "Giderler",
+      text: "Giderler sayfasını açıyorum.",
+    },
+    {
+      test: /(cari|musteri\s*listesi|carilere)/,
+      href: "accounts.html",
+      label: "Cari Hesaplar",
+      text: "Cari hesaplar sayfasını açıyorum.",
+    },
+    {
+      test: /(rapor|kdv\s*ozet|nakit\s*ozet)/,
+      href: "reports.html",
+      label: "Raporlar",
+      text: "Raporlar sayfasını açıyorum.",
+    },
+    {
+      test: /(muhasebeci|mali\s*musavir|musavir\s*panel)/,
+      href: "accountant.html",
+      label: "Muhasebeci Paneli",
+      text: "Muhasebeci panelini açıyorum.",
+    },
+    {
+      test: /(ayarlar|abonelik|gib)/,
+      href: "settings.html",
+      label: "Ayarlar",
+      text: "Ayarlar sayfasını açıyorum.",
+    },
+    {
+      test: /(ana\s*sayfa|dashboard|panele\s*don|basa\s*don)/,
+      href: "dashboard.html",
+      label: "Ana Sayfa",
+      text: "Ana sayfaya gidiyorum.",
+    },
+  ];
+
+  for (const rule of rules) {
+    if (rule.test.test(q)) {
+      return {
+        text: rule.text,
+        href: rule.href,
+        hrefLabel: rule.label + " →",
+        autoNav: true,
+      };
+    }
+  }
+  return null;
+}
+
 function localAssistantAnswer(message, page) {
+  const nav = resolveVoiceCommand(message);
+  if (nav) return nav;
+
   const q = foldTr(message);
   if (!q) {
-    return { text: "Bir soru yazın veya aşağıdaki hazır sorulardan birine tıklayın." };
+    return { text: "Bir soru yazın, mikrofona basıp konuşun veya hazır sorulardan birine tıklayın." };
   }
 
   const exact = CF_ASSISTANT_KB.find((item) => foldTr(item.q) === q);
@@ -1038,18 +1466,23 @@ function localAssistantAnswer(message, page) {
   if (best && bestScore >= 3) return best;
 
   return {
-    text: "Bunu net bilemedim. Fatura kesme, fiş yükleme, cari bakiye veya müşavir geçişi hakkında sorun. Vergi mevzuatı için mali müşavirinize danışın.",
+    text: "Bunu net bilemedim. Örnek: “yeni fatura aç”, “giderlere git”, “cari hesaplar”, “raporları göster”. Veya fatura / fiş / cari hakkında sorun.",
   };
 }
 
 async function askCepteAsistan(message, page) {
+  const nav = resolveVoiceCommand(message);
+  if (nav) return nav;
+
   const token = localStorage.getItem("token");
+  const bizId = typeof activeBusinessId === "function" ? activeBusinessId() : "";
   try {
     const res = await fetch("/api/assistant/chat", {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
         ...(token ? { Authorization: "Bearer " + token } : {}),
+        ...(bizId ? { "X-Business-Id": bizId } : {}),
       },
       body: JSON.stringify({ message, page }),
     });
@@ -1060,6 +1493,7 @@ async function askCepteAsistan(message, page) {
           text: data.reply || data.text,
           href: data.href,
           hrefLabel: data.hrefLabel,
+          pending_action: data.pending_action,
         };
       }
     }
@@ -1103,8 +1537,14 @@ function mountCepteAsistan(page) {
       </form>
     </div>
     <button type="button" class="cf-asst-fab" data-asst-toggle aria-label="Cepte Asistan">
-      <svg xmlns="http://www.w3.org/2000/svg" width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M7.9 20A9 9 0 1 0 4 16.1L2 22Z"/><path d="M8 12h.01"/><path d="M12 12h.01"/><path d="M16 12h.01"/></svg>
+      <img src="../assets/img/logo-icon.png" alt="" width="84" height="84">
     </button>`;
+  const backdrop = document.createElement("button");
+  backdrop.type = "button";
+  backdrop.className = "cf-asst-backdrop";
+  backdrop.setAttribute("aria-label", "Asistanı kapat");
+  backdrop.tabIndex = -1;
+  document.body.appendChild(backdrop);
   document.body.appendChild(root);
 
   const panel = root.querySelector(".cf-asst-panel");
@@ -1144,6 +1584,47 @@ function mountCepteAsistan(page) {
         a.textContent = item.hrefLabel || "Sayfaya git";
         el.appendChild(a);
       }
+      if (item.pending_action) {
+        const action = item.pending_action;
+        const actions = document.createElement("div");
+        actions.className = "cf-asst-confirm";
+        const confirmBtn = document.createElement("button");
+        confirmBtn.type = "button";
+        confirmBtn.className = "cf-asst-confirm-yes";
+        confirmBtn.textContent = action.label || "Onayla";
+        const cancelBtn = document.createElement("button");
+        cancelBtn.type = "button";
+        cancelBtn.className = "cf-asst-confirm-no";
+        cancelBtn.textContent = "Vazgeç";
+        actions.appendChild(confirmBtn);
+        actions.appendChild(cancelBtn);
+        el.appendChild(actions);
+
+        confirmBtn.addEventListener("click", async () => {
+          confirmBtn.disabled = true;
+          cancelBtn.disabled = true;
+          try {
+            await apiFetch(action.endpoint, { method: action.method, body: action.payload });
+            actions.remove();
+            const doneP = document.createElement("p");
+            doneP.className = "cf-asst-confirm-done";
+            doneP.textContent = "Yapıldı.";
+            el.appendChild(doneP);
+            showToast((action.label || "İşlem") + " tamamlandı");
+          } catch (err) {
+            confirmBtn.disabled = false;
+            cancelBtn.disabled = false;
+            showToast(err.message || "İşlem başarısız", "error");
+          }
+        });
+        cancelBtn.addEventListener("click", () => {
+          actions.remove();
+          const cancelP = document.createElement("p");
+          cancelP.className = "cf-asst-confirm-done";
+          cancelP.textContent = "Vazgeçildi.";
+          el.appendChild(cancelP);
+        });
+      }
     }
     msgs.appendChild(el);
     msgs.scrollTop = msgs.scrollHeight;
@@ -1165,6 +1646,7 @@ function mountCepteAsistan(page) {
   function setOpen(open) {
     panel.hidden = !open;
     root.classList.toggle("is-open", open);
+    document.body.classList.toggle("asst-open", open);
     if (open) {
       input.focus();
     } else if (window.speechSynthesis) {
@@ -1186,17 +1668,49 @@ function mountCepteAsistan(page) {
     const answer = await askCepteAsistan(message, page);
     wait.remove();
     addMsg("bot", answer);
+    // Sayfa açma komutlarını seslendirme (küçük ifadeler)
+    if (answer.autoNav && answer.href) {
+      if (window.speechSynthesis) window.speechSynthesis.cancel();
+      busy = false;
+      showToast((answer.hrefLabel || "Sayfa") + " açılıyor…");
+      setTimeout(() => {
+        window.location.href = answer.href;
+      }, 450);
+      return;
+    }
     speak(answer.text);
     busy = false;
   }
 
-  addMsg("bot", { text: meta.hello });
+  addMsg("bot", {
+    text: meta.hello + " Mikrofona basıp aşağıdaki kısa komutları söyleyin; yeşil yanınca konuşun, bitince mik’e tekrar basın.",
+  });
   addChips();
+
+  // Sesli komut kısayolları — tıklayınca da aynı (seslendirilmez)
+  const navChips = document.createElement("div");
+  navChips.className = "cf-asst-chips";
+  [
+    "yeni fatura aç",
+    "giderlere git",
+    "cari hesaplar",
+    "raporları göster",
+    "ana sayfa",
+  ].forEach((label) => {
+    const btn = document.createElement("button");
+    btn.type = "button";
+    btn.textContent = label;
+    btn.title = "Söyle veya tıkla — sayfa açılır, seslendirilmez";
+    btn.addEventListener("click", () => send(label));
+    navChips.appendChild(btn);
+  });
+  msgs.appendChild(navChips);
 
   root.querySelector("[data-asst-toggle]").addEventListener("click", () => {
     setOpen(panel.hidden);
   });
   root.querySelector("[data-asst-close]").addEventListener("click", () => setOpen(false));
+  backdrop.addEventListener("click", () => setOpen(false));
   voiceBtn.addEventListener("click", () => {
     voiceOn = !voiceOn;
     voiceBtn.setAttribute("aria-pressed", voiceOn ? "true" : "false");
@@ -1209,6 +1723,7 @@ function mountCepteAsistan(page) {
     send(input.value);
   });
   micBtn.addEventListener("click", () => {
+    // Dinlerken tekrar tık = bitir (startSpeechToText içinde)
     startSpeechToText(input, micBtn, (value) => {
       if (value && value.trim()) send(value);
     });

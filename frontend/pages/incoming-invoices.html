@@ -194,6 +194,7 @@
             </div>
             <div style="display:flex; justify-content:flex-end; gap:10px; margin-top:20px; border-top:1px solid #f1f5f9; padding-top:12px;">
                 <button class="btn btn-secondary" id="closeModalBtn">Kapat</button>
+                <button class="btn btn-primary" type="button" id="btn-pay-invoice" hidden>Ödeme Yap →</button>
                 <button class="btn btn-primary" type="button" id="btn-pdf-invoice">PDF İndir</button>
             </div>
         </div>
@@ -263,10 +264,13 @@
             const modal = document.getElementById('invoiceModal');
             const closeModal = document.getElementById('closeModal');
             const closeModalBtn = document.getElementById('closeModalBtn');
+            const payBtn = document.getElementById('btn-pay-invoice');
+            let currentInvoiceId = null;
 
             async function openDetail(id) {
                 try {
                     const inv = await apiFetch('/api/invoices/' + id);
+                    currentInvoiceId = inv.id;
                     document.getElementById('m-fatura-no').innerText = inv.fatura_no;
                     document.getElementById('m-fatura-turu').innerText = inv.fatura_turu;
                     document.getElementById('m-cari').innerText = inv.gonderen_isletme || inv.cari_adi;
@@ -274,6 +278,9 @@
                     document.getElementById('m-vade').innerText = dateTr(inv.vade_tarihi);
                     document.getElementById('m-durum').innerText = inv.durum;
                     document.getElementById('m-toplam').innerText = money(inv.tutar);
+
+                    const beklemede = inv.durum === 'Bekliyor' || inv.durum === 'Gecikti';
+                    payBtn.hidden = !beklemede;
 
                     const kalemlerBody = document.getElementById('m-kalemler');
                     kalemlerBody.innerHTML = '';
@@ -302,6 +309,40 @@
             modal.addEventListener('click', function (e) {
                 if (e.target === modal) hideModal();
             });
+
+            payBtn.addEventListener('click', async function () {
+                if (!currentInvoiceId) return;
+                payBtn.disabled = true;
+                try {
+                    const result = await apiFetch('/api/invoices/' + currentInvoiceId + '/payment', { method: 'POST' });
+                    if (result.paymentPageUrl) {
+                        window.location.href = result.paymentPageUrl;
+                        return;
+                    }
+                    if (result.demo) {
+                        showToast('Demo ödeme alındı — fatura Ödendi');
+                        hideModal();
+                        loadInvoices();
+                        payBtn.disabled = false;
+                        return;
+                    }
+                    showToast('Ödeme yanıtı alınamadı', 'error');
+                    payBtn.disabled = false;
+                } catch (err) {
+                    showToast(err.message || 'Ödeme başlatılamadı', 'error');
+                    payBtn.disabled = false;
+                }
+            });
+
+            const paymentParam = new URLSearchParams(window.location.search).get('payment');
+            if (paymentParam === 'success') {
+                showToast('Ödeme alındı, fatura ödendi olarak işaretlendi');
+            } else if (paymentParam === 'failed') {
+                showToast('Ödeme tamamlanamadı', 'error');
+            }
+            if (paymentParam) {
+                history.replaceState(null, '', window.location.pathname);
+            }
 
             loadInvoices();
         });

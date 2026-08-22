@@ -1372,10 +1372,16 @@ function resolveVoiceCommand(message) {
       text: "Otomatik fatura şablonuna gidiyorum.",
     },
     {
+      test: /(gelen\s*fatura)/,
+      href: "incoming-invoices.html",
+      label: "Gelen Faturalar",
+      text: "Gelen faturalar listesini açıyorum.",
+    },
+    {
       test: /(faturalar|fatura\s*listesi|faturalara\s*(git|ac|goster))/,
       href: "invoices.html",
-      label: "Faturalar",
-      text: "Faturalar listesini açıyorum.",
+      label: "Giden Faturalar",
+      text: "Giden faturalar listesini açıyorum.",
     },
     {
       test: /(yeni\s*gider|gider\s*(ekle|kaydet|ac)|fis\s*(yukle|tara|ac)|ocr)/,

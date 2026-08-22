@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Faturalar | Akıllı Muhasebe</title>
+    <title>Giden Faturalar | Akıllı Muhasebe</title>
     <link rel="stylesheet" href="../assets/css/style.css">
     <link rel="icon" href="../assets/img/logo-icon.png">
     <style>
@@ -103,8 +103,8 @@
 
             <div class="page-heading">
                 <div>
-                    <h1>Faturalar</h1>
-                    <p>Kesilen ve gelen faturalarınızı yönetin.</p>
+                    <h1>Giden Faturalar</h1>
+                    <p>Kestiğiniz faturaları ve ödeme durumlarını yönetin.</p>
                 </div>
                 <div style="display:flex; gap:10px;">
                     <a class="btn btn-secondary" href="dashboard.html"> Ana Sayfa</a>
@@ -198,7 +198,7 @@
             </div>
             <div style="display:flex; justify-content:flex-end; gap:10px; margin-top:20px; border-top:1px solid #f1f5f9; padding-top:12px;">
                 <button class="btn btn-secondary" id="closeModalBtn">Kapat</button>
-                <button class="btn btn-primary" type="button" id="btn-pay-invoice" hidden>Ödeme Yap →</button>
+                <button class="btn btn-primary" type="button" id="btn-pay-invoice" hidden>Ödeme Al →</button>
                 <button class="btn btn-primary" type="button" id="btn-pdf-invoice">PDF İndir</button>
             </div>
         </div>
@@ -345,7 +345,7 @@
                         return;
                     }
                     if (result.demo) {
-                        showToast('Demo ödeme alındı — fatura Ödendi');
+                        showToast('Demo tahsilat alındı — fatura Ödendi');
                         hideModal();
                         loadInvoices();
                         payBtn.disabled = false;
@@ -361,7 +361,7 @@
 
             const paymentParam = new URLSearchParams(window.location.search).get('payment');
             if (paymentParam === 'success') {
-                showToast('Ödeme alındı, fatura ödendi olarak işaretlendi');
+                showToast('Tahsilat alındı, fatura ödendi olarak işaretlendi');
             } else if (paymentParam === 'failed') {
                 showToast('Ödeme tamamlanamadı', 'error');
             }

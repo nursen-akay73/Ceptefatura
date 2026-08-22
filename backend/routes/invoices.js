@@ -458,12 +458,19 @@ router.delete("/:id", async (req, res) => {
   }
 });
 
+// Ödeme başlatma: hem faturayı kesen işletme (kendi kestiği faturada
+// tahsilat başlatır) hem de faturanın muhatabı olan işletme (gelen faturada
+// borcunu öder) bu uca erişebilir — GET /:id ile aynı çapraz-işletme kuralı.
 router.post("/:id/payment", async (req, res) => {
   try {
     const { rows } = await pool.query(
       `SELECT i.*, a.cari_adi, a.email AS cari_email, a.telefon AS cari_telefon
        FROM invoices i JOIN accounts a ON a.id = i.account_id
-       WHERE i.id = $1 AND i.business_id = $2`,
+       WHERE i.id = $1
+         AND (
+           i.business_id = $2
+           OR a.vergi_no = (SELECT vergi_no FROM businesses WHERE id = $2)
+         )`,
       [req.params.id, req.businessId]
     );
     const invoice = rows[0];

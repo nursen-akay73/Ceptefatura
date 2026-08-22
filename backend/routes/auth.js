@@ -5,7 +5,7 @@ const { pool } = require("../db");
 const { requireAuth, ensureDefaultBusiness } = require("../middleware/auth");
 
 router.post("/register", async (req, res) => {
-  const { ad_soyad, isletme_adi, email, sifre, sifre_tekrar } = req.body || {};
+  const { ad_soyad, isletme_adi, email, sifre, sifre_tekrar, vergi_no } = req.body || {};
 
   if (!ad_soyad || !isletme_adi || !email || !sifre) {
     return res.status(400).json({ error: "ad_soyad, isletme_adi, email, sifre zorunlu" });
@@ -13,9 +13,25 @@ router.post("/register", async (req, res) => {
   if (sifre_tekrar && sifre !== sifre_tekrar) {
     return res.status(400).json({ error: "şifreler eşleşmiyor" });
   }
+  const vergiNoTrimmed = vergi_no ? String(vergi_no).trim() : "";
+  if (vergiNoTrimmed && !/^\d{10,11}$/.test(vergiNoTrimmed)) {
+    return res.status(400).json({ error: "vergi no 10 haneli vergi numarası veya 11 haneli TC kimlik no olmalı" });
+  }
 
   const client = await pool.connect();
   try {
+    if (vergiNoTrimmed) {
+      const { rows: existingBiz } = await client.query(
+        `SELECT id FROM businesses WHERE vergi_no = $1`,
+        [vergiNoTrimmed]
+      );
+      if (existingBiz[0]) {
+        return res.status(409).json({
+          error: "Bu vergi numarasıyla kayıtlı bir işletme zaten var. Giriş yapmayı deneyin ya da işletme sahibinden Muhasebeci Paneli'nden sizi müşavir olarak eklemesini isteyin.",
+        });
+      }
+    }
+
     const sifreHash = await bcrypt.hash(sifre, 10);
     await client.query("BEGIN");
 
@@ -28,8 +44,8 @@ router.post("/register", async (req, res) => {
     const user = rows[0];
 
     const { rows: businessRows } = await client.query(
-      `INSERT INTO businesses (isletme_adi) VALUES ($1) RETURNING id`,
-      [isletme_adi]
+      `INSERT INTO businesses (isletme_adi, vergi_no) VALUES ($1, $2) RETURNING id`,
+      [isletme_adi, vergiNoTrimmed || null]
     );
     const businessId = businessRows[0].id;
 
@@ -47,6 +63,9 @@ router.post("/register", async (req, res) => {
   } catch (err) {
     await client.query("ROLLBACK");
     if (err.code === "23505") {
+      if (err.constraint === "businesses_vergi_no_key" || /vergi_no/.test(err.detail || "")) {
+        return res.status(409).json({ error: "Bu vergi numarasıyla kayıtlı bir işletme zaten var." });
+      }
       return res.status(409).json({ error: "bu e-posta zaten kayıtlı" });
     }
     console.error(err);

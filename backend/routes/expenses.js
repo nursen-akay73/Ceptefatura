@@ -1,8 +1,9 @@
 const router = require("express").Router();
 const fs = require("fs");
+const path = require("path");
 const { pool } = require("../db");
 const { requireAuth, resolveBusinessContext } = require("../middleware/auth");
-const { upload } = require("../middleware/upload");
+const { upload, UPLOAD_DIR } = require("../middleware/upload");
 const { extractExpenseFromDocument } = require("../services/documentScan");
 
 const KATEGORILER = ["Ofis", "Ulaşım", "Hizmet", "Yemek / Temsil", "Diğer"];
@@ -145,6 +146,93 @@ router.post("/upload", upload.single("fis"), async (req, res) => {
       ocr: null,
       not: err.message || "OCR okunamadı, alanları elle gir",
     });
+  }
+});
+
+router.get("/:id", async (req, res) => {
+  try {
+    const { rows } = await pool.query(
+      `SELECT id, tarih, firma, kategori, tutar, kaynak, aciklama, durum, belge_yolu, branch_id, created_at
+       FROM expenses WHERE id = $1 AND business_id = $2`,
+      [req.params.id, req.businessId]
+    );
+    if (!rows[0]) return res.status(404).json({ error: "Gider bulunamadı" });
+    res.json(rows[0]);
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: "Gider alınamadı" });
+  }
+});
+
+const DURUMLAR = ["İşlendi", "Kontrol Bekliyor"];
+
+router.patch("/:id", async (req, res) => {
+  const { tarih, tutar, kategori, kaynak, aciklama, firma, branch_id, durum } = req.body || {};
+
+  if (!tarih || tutar === undefined || tutar === "" || !kategori) {
+    return res.status(400).json({ error: "tarih, tutar ve kategori zorunludur" });
+  }
+  if (Number(tutar) < 0) {
+    return res.status(400).json({ error: "tutar negatif olamaz" });
+  }
+  if (!KATEGORILER.includes(kategori)) {
+    return res.status(400).json({ error: "geçersiz kategori" });
+  }
+  const kaynakDeger = kaynak || "Manuel";
+  if (!KAYNAKLAR.includes(kaynakDeger)) {
+    return res.status(400).json({ error: "geçersiz kaynak" });
+  }
+  const durumDeger = durum || "İşlendi";
+  if (!DURUMLAR.includes(durumDeger)) {
+    return res.status(400).json({ error: "geçersiz durum" });
+  }
+
+  try {
+    const { rows } = await pool.query(
+      `UPDATE expenses
+       SET tarih = $1, tutar = $2, kategori = $3, kaynak = $4, aciklama = $5, firma = $6, branch_id = $7, durum = $8
+       WHERE id = $9 AND business_id = $10
+       RETURNING id, tarih, firma, kategori, tutar, kaynak, aciklama, durum, belge_yolu, branch_id, created_at`,
+      [
+        tarih,
+        tutar,
+        kategori,
+        kaynakDeger,
+        aciklama || null,
+        firma || null,
+        branch_id || null,
+        durumDeger,
+        req.params.id,
+        req.businessId,
+      ]
+    );
+    if (!rows[0]) return res.status(404).json({ error: "Gider bulunamadı" });
+    res.json(rows[0]);
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: "Gider güncellenemedi" });
+  }
+});
+
+router.delete("/:id", async (req, res) => {
+  try {
+    const { rows } = await pool.query(
+      `DELETE FROM expenses WHERE id = $1 AND business_id = $2 RETURNING belge_yolu`,
+      [req.params.id, req.businessId]
+    );
+    if (!rows[0]) return res.status(404).json({ error: "Gider bulunamadı" });
+
+    // Yüklenmiş fiş/fatura görseli varsa diskten de temizle (best effort).
+    const belgeYolu = rows[0].belge_yolu;
+    if (belgeYolu) {
+      const dosyaAdi = belgeYolu.replace(/^\/uploads\//, "");
+      fs.unlink(path.join(UPLOAD_DIR, dosyaAdi), () => {});
+    }
+
+    res.json({ ok: true });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: "Gider silinemedi" });
   }
 });
 

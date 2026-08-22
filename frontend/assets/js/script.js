@@ -111,6 +111,25 @@ document.addEventListener("DOMContentLoaded", () => {
           clearSession();
           window.location.href = "login.html";
         });
+
+        const notifMenu = document.getElementById("notif-menu");
+        if (notifMenu && localStorage.getItem("token")) {
+          document.getElementById("notif-bell")?.addEventListener("click", (e) => {
+            e.stopPropagation();
+            const opening = !notifMenu.classList.contains("open");
+            notifMenu.classList.toggle("open", opening);
+            if (opening) loadNotifList();
+          });
+          // Dropdown içindeki tıklamalar dışarı taşıp paneli erken kapatmasın.
+          document.getElementById("notif-dropdown")?.addEventListener("click", (e) => e.stopPropagation());
+          document.addEventListener("click", () => notifMenu.classList.remove("open"));
+          document.getElementById("notif-mark-all")?.addEventListener("click", async () => {
+            await markAllNotificationsRead();
+          });
+          initNotifBell();
+        } else if (notifMenu) {
+          notifMenu.hidden = true;
+        }
       }
     });
 
@@ -569,23 +588,152 @@ async function applyUserMenu() {
   } catch {}
 }
 
+/* --- Bildirim zili: vadesi yaklaşan/geçen faturalar için otomatik hatırlatmalar --- */
+let _notifPollHandle = null;
+
+function dateTrShort(d) {
+  return d ? new Date(d).toLocaleDateString("tr-TR") : "";
+}
+
+function paintNotifBadge(count) {
+  const badge = document.getElementById("notif-badge");
+  if (!badge) return;
+  if (!count) {
+    badge.hidden = true;
+    badge.textContent = "0";
+  } else {
+    badge.hidden = false;
+    badge.textContent = count > 9 ? "9+" : String(count);
+  }
+}
+
+async function loadNotifUnreadCount() {
+  try {
+    const data = await apiFetch("/api/notifications/unread-count");
+    paintNotifBadge(data.count || 0);
+  } catch {}
+}
+
+async function loadNotifList() {
+  const list = document.getElementById("notif-list");
+  if (!list) return;
+  list.innerHTML = '<p class="muted notif-empty">Yükleniyor…</p>';
+  try {
+    // Panel her açıldığında güncel veriyle taransın (arka plan zamanlayıcısını beklemeden).
+    await apiFetch("/api/notifications/sweep", { method: "POST" }).catch(() => {});
+    const items = await apiFetch("/api/notifications");
+    renderNotifList(items || []);
+    const unread = (items || []).filter((n) => n.durum === "okunmadi").length;
+    paintNotifBadge(unread);
+  } catch (err) {
+    list.innerHTML = `<p class="muted notif-empty">Bildirimler alınamadı.</p>`;
+  }
+}
+
+function renderNotifList(items) {
+  const list = document.getElementById("notif-list");
+  if (!list) return;
+  list.innerHTML = "";
+  if (!items.length) {
+    list.innerHTML = '<p class="muted notif-empty">Bildiriminiz yok.</p>';
+    return;
+  }
+  items.forEach((n) => {
+    const btn = document.createElement("button");
+    btn.type = "button";
+    btn.className = "notif-item" + (n.durum === "okunmadi" ? " is-unread" : "");
+    btn.dataset.id = n.id;
+    btn.innerHTML = `
+      <span class="notif-item-top"><span class="notif-item-dot"></span><span class="notif-item-msg"></span></span>
+      <span class="notif-item-time"></span>`;
+    btn.querySelector(".notif-item-msg").textContent = n.mesaj;
+    btn.querySelector(".notif-item-time").textContent = dateTrShort(n.created_at);
+    btn.addEventListener("click", async () => {
+      if (n.durum === "okunmadi") {
+        await markNotificationRead(n.id);
+        btn.classList.remove("is-unread");
+      }
+      window.location.href = "invoices.html";
+    });
+    list.appendChild(btn);
+  });
+}
+
+async function markNotificationRead(id) {
+  try {
+    await apiFetch(`/api/notifications/${id}/read`, { method: "POST" });
+    loadNotifUnreadCount();
+  } catch {}
+}
+
+async function markAllNotificationsRead() {
+  try {
+    await apiFetch("/api/notifications/read-all", { method: "POST" });
+    document.querySelectorAll(".notif-item.is-unread").forEach((el) => el.classList.remove("is-unread"));
+    paintNotifBadge(0);
+  } catch {}
+}
+
+function initNotifBell() {
+  loadNotifUnreadCount();
+  if (_notifPollHandle) clearInterval(_notifPollHandle);
+  // Sayfa açık kaldığı sürece rozet düzenli tazelensin.
+  _notifPollHandle = setInterval(loadNotifUnreadCount, 60000);
+}
+
 function fillSettingsUser(user) {
   if (!user || document.body.dataset.page !== "settings") return;
   const name = document.getElementById("set-ad-soyad");
   const email = document.getElementById("set-email");
-  const company = document.getElementById("set-isletme");
-  const mailFirma = document.getElementById("set-firma-email");
   if (name && !name.dataset.dirty) name.value = user.ad_soyad || "";
   if (email && !email.dataset.dirty) email.value = user.email || "";
-  if (company && !company.dataset.dirty) company.value = user.isletme_adi || company.value;
-  if (mailFirma && user.email && mailFirma.value === "info@ceptefatura.com") {
-    mailFirma.value = user.email;
+}
+
+const FIRMA_PROFIL_FIELDS = {
+  "set-isletme": "isletme_adi",
+  "set-vergi-no": "vergi_no",
+  "set-vergi-dairesi": "vergi_dairesi",
+  "set-firma-telefon": "telefon",
+  "set-firma-email": "email",
+  "set-firma-sehir": "sehir",
+  "set-firma-adres": "adres",
+};
+
+async function loadFirmaProfil() {
+  const form = document.getElementById("form-firma-profil");
+  if (!form) return;
+  const businessId = activeBusinessId();
+  if (!businessId) return;
+
+  try {
+    const list = await apiFetch("/api/businesses");
+    const biz = list.find((b) => b.id === businessId) || list[0];
+    if (!biz) return;
+
+    form.dataset.businessId = biz.id;
+    Object.entries(FIRMA_PROFIL_FIELDS).forEach(([id, key]) => {
+      const el = document.getElementById(id);
+      if (el && !el.dataset.dirty) el.value = biz[key] || "";
+    });
+
+    const readOnly = biz.role !== "sahip";
+    const note = document.getElementById("firma-profil-readonly-note");
+    if (note) note.hidden = !readOnly;
+    Object.keys(FIRMA_PROFIL_FIELDS).forEach((id) => {
+      const el = document.getElementById(id);
+      if (el) el.disabled = readOnly;
+    });
+    const submitBtn = form.querySelector("button[type=submit]");
+    if (submitBtn) submitBtn.disabled = readOnly;
+  } catch (err) {
+    showToast(err.message || "Firma bilgileri alınamadı", "error");
   }
 }
 
 function initSettingsPage() {
   const user = getSessionUser();
   fillSettingsUser(user);
+  loadFirmaProfil();
 
   const hash = (location.hash || "").replace("#", "");
   if (hash) {
@@ -622,6 +770,41 @@ function initSettingsPage() {
     showToast("Bildirim tercihleri kaydedildi");
   });
 
+  document.getElementById("form-firma-profil")?.addEventListener("submit", async (e) => {
+    e.preventDefault();
+    const form = e.target;
+    const businessId = form.dataset.businessId || activeBusinessId();
+    if (!businessId) {
+      showToast("Aktif işletme bulunamadı", "error");
+      return;
+    }
+    const isletmeAdi = document.getElementById("set-isletme")?.value.trim();
+    if (!isletmeAdi) {
+      showToast("İşletme unvanı zorunlu", "error");
+      return;
+    }
+    const body = { isletme_adi: isletmeAdi };
+    Object.entries(FIRMA_PROFIL_FIELDS).forEach(([id, key]) => {
+      if (key === "isletme_adi") return;
+      body[key] = document.getElementById(id)?.value.trim() || null;
+    });
+
+    const submitBtn = form.querySelector("button[type=submit]");
+    if (submitBtn) submitBtn.disabled = true;
+    try {
+      await apiFetch("/api/businesses/" + businessId, { method: "PATCH", body });
+      Object.keys(FIRMA_PROFIL_FIELDS).forEach((id) => {
+        const el = document.getElementById(id);
+        if (el) delete el.dataset.dirty;
+      });
+      showToast("Firma profili kaydedildi");
+    } catch (err) {
+      showToast(err.message || "Firma profili kaydedilemedi", "error");
+    } finally {
+      if (submitBtn) submitBtn.disabled = false;
+    }
+  });
+
   document.getElementById("btn-invite-accountant")?.addEventListener("click", () => {
     const mail = document.getElementById("set-invite-email")?.value.trim();
     if (!mail) {
@@ -631,7 +814,7 @@ function initSettingsPage() {
     showToast("Davet e-postası gönderildi");
   });
 
-  ["set-ad-soyad", "set-email", "set-isletme"].forEach((id) => {
+  ["set-ad-soyad", "set-email", ...Object.keys(FIRMA_PROFIL_FIELDS)].forEach((id) => {
     document.getElementById(id)?.addEventListener("input", (e) => {
       e.target.dataset.dirty = "1";
     });

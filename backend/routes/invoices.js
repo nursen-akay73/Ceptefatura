@@ -6,6 +6,7 @@ const { requireAuth, resolveBusinessContext } = require("../middleware/auth");
 const { upload } = require("../middleware/upload");
 const { extractInvoiceFromDocument } = require("../services/documentScan");
 const { getClient: getIyzicoClient, isConfigured: isIyzicoConfigured } = require("../lib/iyzico");
+const { clearNotificationsForInvoice } = require("../services/reminders");
 
 const TURLER = ["E-Fatura", "E-Arşiv"];
 const DURUMLAR = ["Ödendi", "Bekliyor", "Gecikti"];
@@ -53,6 +54,7 @@ router.post("/:id/payment-callback", async (req, res) => {
           [JSON.stringify(result), payment.id]
         );
         await pool.query(`UPDATE invoices SET durum = 'Ödendi' WHERE id = $1`, [payment.invoice_id]);
+        await clearNotificationsForInvoice(payment.invoice_id);
         res.redirect(FRONTEND_REDIRECT + "?payment=success");
       } catch (dbErr) {
         console.error(dbErr);
@@ -185,13 +187,68 @@ router.post("/templates", async (req, res) => {
   }
 });
 
+// Vergi numaramız adına başka bir işletmenin kestiği faturalar ("gelen faturalar").
+// Eşleştirme: faturayı kesen işletmenin seçtiği carinin (accounts.vergi_no) bizim
+// işletmemizin vergi_no'suna eşit olması. Kendi kestiğimiz faturalar hariç tutulur.
+router.get("/received", async (req, res) => {
+  const { search, status, type } = req.query;
+
+  try {
+    const { rows: bizRows } = await pool.query(
+      `SELECT vergi_no FROM businesses WHERE id = $1`,
+      [req.businessId]
+    );
+    const myVergiNo = bizRows[0] && bizRows[0].vergi_no;
+    if (!myVergiNo) {
+      return res.json([]);
+    }
+
+    const conditions = ["a.vergi_no = $1", "i.business_id <> $2"];
+    const values = [myVergiNo, req.businessId];
+
+    if (status && DURUMLAR.includes(status)) {
+      values.push(status);
+      conditions.push(`i.durum = $${values.length}`);
+    }
+    if (type && TURLER.includes(type)) {
+      values.push(type);
+      conditions.push(`i.fatura_turu = $${values.length}`);
+    }
+    if (search) {
+      values.push(`%${search}%`);
+      conditions.push(`(i.fatura_no ILIKE $${values.length} OR b.isletme_adi ILIKE $${values.length})`);
+    }
+
+    const { rows } = await pool.query(
+      `SELECT i.id, i.fatura_no, i.fatura_turu, i.kesim_tarihi AS tarih, i.vade_tarihi AS vade,
+              i.tutar, i.durum, b.isletme_adi AS gonderen, b.vergi_no AS gonderen_vergi_no
+       FROM invoices i
+       JOIN accounts a ON a.id = i.account_id
+       JOIN businesses b ON b.id = i.business_id
+       WHERE ${conditions.join(" AND ")}
+       ORDER BY i.kesim_tarihi DESC`,
+      values
+    );
+    res.json(rows);
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: "gelen faturalar alınamadı" });
+  }
+});
+
 router.get("/:id", async (req, res) => {
   try {
     const { rows: invoices } = await pool.query(
-      `SELECT i.*, a.cari_adi
+      `SELECT i.*, a.cari_adi, b.isletme_adi AS gonderen_isletme, b.vergi_no AS gonderen_vergi_no,
+              (i.business_id <> $2) AS gelen
        FROM invoices i
        JOIN accounts a ON a.id = i.account_id
-       WHERE i.id = $1 AND i.business_id = $2`,
+       JOIN businesses b ON b.id = i.business_id
+       WHERE i.id = $1
+         AND (
+           i.business_id = $2
+           OR a.vergi_no = (SELECT vergi_no FROM businesses WHERE id = $2)
+         )`,
       [req.params.id, req.businessId]
     );
     if (!invoices[0]) {
@@ -282,6 +339,125 @@ router.post("/", async (req, res) => {
   }
 });
 
+// Sadece kendi kestiğimiz faturalar düzenlenebilir/silinebilir ("gelen
+// faturalar" salt okunur — onları biz kesmedik). kalemler gönderilirse
+// tamamı değiştirilir ve tutar yeniden hesaplanır; gönderilmezse kalemler
+// ve tutar olduğu gibi kalır.
+router.patch("/:id", async (req, res) => {
+  const client = await pool.connect();
+  try {
+    const { rows: existingRows } = await client.query(
+      `SELECT * FROM invoices WHERE id = $1 AND business_id = $2`,
+      [req.params.id, req.businessId]
+    );
+    const existing = existingRows[0];
+    if (!existing) {
+      return res.status(404).json({ error: "fatura bulunamadı" });
+    }
+
+    const body = req.body || {};
+    const account_id = body.account_id || existing.account_id;
+    const branch_id = "branch_id" in body ? body.branch_id || null : existing.branch_id;
+    const fatura_turu = body.fatura_turu || existing.fatura_turu;
+    const kesim_tarihi = body.kesim_tarihi || existing.kesim_tarihi;
+    const vade_tarihi = "vade_tarihi" in body ? body.vade_tarihi || null : existing.vade_tarihi;
+    const fatura_notu = "fatura_notu" in body ? body.fatura_notu || null : existing.fatura_notu;
+    const durum = body.durum || existing.durum;
+
+    if (!TURLER.includes(fatura_turu)) {
+      return res.status(400).json({ error: "geçersiz fatura_turu" });
+    }
+    if (!DURUMLAR.includes(durum)) {
+      return res.status(400).json({ error: "geçersiz durum" });
+    }
+
+    if (body.account_id) {
+      const own = await client.query(
+        `SELECT id FROM accounts WHERE id = $1 AND business_id = $2`,
+        [account_id, req.businessId]
+      );
+      if (!own.rows[0]) {
+        return res.status(400).json({ error: "cari bulunamadı" });
+      }
+    }
+
+    await client.query("BEGIN");
+
+    let tutar = existing.tutar;
+    let items = null;
+    if (Array.isArray(body.kalemler)) {
+      if (body.kalemler.length === 0) {
+        await client.query("ROLLBACK");
+        return res.status(400).json({ error: "en az bir kalem gerekli" });
+      }
+      items = body.kalemler.map((k) => ({
+        aciklama: k.aciklama || "",
+        miktar: Number(k.miktar || 1),
+        birim_fiyat: Number(k.birim_fiyat || 0),
+        kdv_orani: Number(k.kdv_orani ?? 20),
+        tutar: kalemTutar(k),
+      }));
+      tutar = items.reduce((s, k) => s + k.tutar, 0);
+
+      await client.query(`DELETE FROM invoice_items WHERE invoice_id = $1`, [req.params.id]);
+      for (const k of items) {
+        await client.query(
+          `INSERT INTO invoice_items (invoice_id, aciklama, miktar, birim_fiyat, kdv_orani, tutar)
+           VALUES ($1, $2, $3, $4, $5, $6)`,
+          [req.params.id, k.aciklama, k.miktar, k.birim_fiyat, k.kdv_orani, k.tutar]
+        );
+      }
+    }
+
+    const { rows } = await client.query(
+      `UPDATE invoices
+       SET account_id = $1, branch_id = $2, fatura_turu = $3, kesim_tarihi = $4,
+           vade_tarihi = $5, fatura_notu = $6, durum = $7, tutar = $8
+       WHERE id = $9 AND business_id = $10
+       RETURNING *`,
+      [account_id, branch_id, fatura_turu, kesim_tarihi, vade_tarihi, fatura_notu, durum, tutar, req.params.id, req.businessId]
+    );
+
+    await client.query("COMMIT");
+
+    if (durum === "Ödendi") {
+      await clearNotificationsForInvoice(req.params.id);
+    }
+
+    if (!items) {
+      const { rows: kalemler } = await pool.query(
+        `SELECT id, aciklama, miktar, birim_fiyat, kdv_orani, tutar FROM invoice_items WHERE invoice_id = $1`,
+        [req.params.id]
+      );
+      items = kalemler;
+    }
+
+    res.json({ ...rows[0], kalemler: items });
+  } catch (err) {
+    await client.query("ROLLBACK").catch(() => {});
+    console.error(err);
+    res.status(500).json({ error: "fatura güncellenemedi" });
+  } finally {
+    client.release();
+  }
+});
+
+router.delete("/:id", async (req, res) => {
+  try {
+    const { rows } = await pool.query(
+      `DELETE FROM invoices WHERE id = $1 AND business_id = $2 RETURNING id`,
+      [req.params.id, req.businessId]
+    );
+    if (!rows[0]) return res.status(404).json({ error: "fatura bulunamadı" });
+    // invoice_items, payments ve notifications kayıtları ON DELETE CASCADE ile
+    // otomatik silinir.
+    res.json({ ok: true });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: "fatura silinemedi" });
+  }
+});
+
 router.post("/:id/payment", async (req, res) => {
   try {
     const { rows } = await pool.query(
@@ -315,6 +491,7 @@ router.post("/:id/payment", async (req, res) => {
          VALUES ($1, 'demo', $2, 'Basarili', $3)`,
         [invoice.id, "demo-" + invoice.id + "-" + Date.now(), price]
       );
+      await clearNotificationsForInvoice(invoice.id);
       return res.json({
         demo: true,
         message: "Demo ödeme tamamlandı (iyzico anahtarı tanımlı değil)",

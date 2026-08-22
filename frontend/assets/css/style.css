@@ -1731,6 +1731,140 @@ body.asst-open .cf-asst-backdrop {
     .user-dropdown a:hover { background: var(--bg); }
     .user-dropdown a.danger { color: var(--danger); }
 
+/* --- Bildirim zili --- */
+.notif-menu {
+    position: relative;
+    z-index: 45;
+}
+
+.notif-bell {
+    position: relative;
+}
+
+.notif-badge {
+    position: absolute;
+    top: 2px;
+    right: 2px;
+    min-width: 16px;
+    height: 16px;
+    padding: 0 4px;
+    border-radius: 999px;
+    background: var(--danger);
+    color: #fff;
+    font-size: 10px;
+    font-weight: 700;
+    line-height: 16px;
+    text-align: center;
+    box-shadow: 0 0 0 2px #fff;
+}
+
+.notif-dropdown {
+    display: none;
+    position: absolute;
+    right: 0;
+    top: calc(100% + 10px);
+    background: #fff;
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    box-shadow: var(--shadow-card-hover);
+    width: 320px;
+    max-width: calc(100vw - 32px);
+    z-index: 50;
+    overflow: hidden;
+}
+
+    .notif-menu.open .notif-dropdown {
+        display: block;
+    }
+
+.notif-dropdown-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 12px 14px;
+    border-bottom: 1px solid var(--border);
+}
+
+    .notif-dropdown-header strong {
+        font-size: 13px;
+        color: var(--text);
+    }
+
+    .notif-dropdown-header .text-btn {
+        font-size: 12px;
+    }
+
+.notif-list {
+    max-height: 360px;
+    overflow-y: auto;
+}
+
+.notif-list .notif-empty {
+    padding: 18px 14px;
+    text-align: center;
+    font-size: 13px;
+}
+
+.notif-item {
+    display: block;
+    width: 100%;
+    text-align: left;
+    padding: 10px 14px;
+    border: 0;
+    border-bottom: 1px solid var(--border);
+    background: #fff;
+    cursor: pointer;
+    font-family: inherit;
+}
+
+    .notif-item:last-child {
+        border-bottom: 0;
+    }
+
+    .notif-item:hover {
+        background: var(--bg);
+    }
+
+    .notif-item.is-unread {
+        background: #eff6ff;
+    }
+
+    .notif-item.is-unread:hover {
+        background: #e0edff;
+    }
+
+.notif-item-top {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+}
+
+.notif-item-dot {
+    width: 7px;
+    height: 7px;
+    border-radius: 50%;
+    background: var(--primary);
+    flex-shrink: 0;
+    visibility: hidden;
+}
+
+    .notif-item.is-unread .notif-item-dot {
+        visibility: visible;
+    }
+
+.notif-item-msg {
+    font-size: 13px;
+    color: var(--text);
+    line-height: 1.4;
+}
+
+.notif-item-time {
+    display: block;
+    margin-top: 3px;
+    font-size: 11px;
+    color: var(--muted);
+}
+
 .action-card {
     display: flex;
     align-items: center;

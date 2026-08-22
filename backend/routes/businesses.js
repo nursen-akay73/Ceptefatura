@@ -7,7 +7,8 @@ router.use(requireAuth);
 router.get("/", async (req, res) => {
   try {
     const { rows } = await pool.query(
-      `SELECT b.id, b.isletme_adi, b.vergi_no, b.vergi_dairesi, ub.role, ub.status
+      `SELECT b.id, b.isletme_adi, b.vergi_no, b.vergi_dairesi, b.telefon, b.email, b.sehir, b.adres,
+              ub.role, ub.status
        FROM user_businesses ub
        JOIN businesses b ON b.id = ub.business_id
        WHERE ub.user_id = $1
@@ -151,10 +152,75 @@ router.post("/", async (req, res) => {
     res.status(201).json({ ...business, role: "musavir", status: "onaylandi" });
   } catch (err) {
     await client.query("ROLLBACK");
+    if (err.code === "23505" && err.constraint === "businesses_vergi_no_key") {
+      // Aynı anda iki istek aynı vergi_no ile yeni işletme açmaya çalıştı (yarış durumu).
+      return res.status(409).json({ error: "Bu vergi numarasıyla kayıtlı bir işletme az önce oluşturuldu, tekrar deneyin." });
+    }
     console.error(err);
     res.status(500).json({ error: "işletme oluşturulamadı" });
   } finally {
     client.release();
+  }
+});
+
+// Ayarlar → Firma Profil Bilgileri sekmesinden gerçek işletme kaydını günceller.
+// Sadece işletmenin onaylanmış sahibi düzenleyebilir (müşavir salt-okunur görür).
+router.patch("/:id", async (req, res) => {
+  const { isletme_adi, vergi_no, vergi_dairesi, telefon, email, sehir, adres } = req.body || {};
+  if (!isletme_adi) {
+    return res.status(400).json({ error: "isletme_adi zorunlu" });
+  }
+  const vergiNoTrimmed = vergi_no ? String(vergi_no).trim() : "";
+  if (vergiNoTrimmed && !/^\d{10,11}$/.test(vergiNoTrimmed)) {
+    return res.status(400).json({ error: "vergi no 10 haneli vergi numarası veya 11 haneli TC kimlik no olmalı" });
+  }
+
+  try {
+    const own = await pool.query(
+      `SELECT 1 FROM user_businesses
+       WHERE user_id = $1 AND business_id = $2 AND status = 'onaylandi' AND role = 'sahip'`,
+      [req.userId, req.params.id]
+    );
+    if (!own.rows[0]) {
+      return res.status(403).json({ error: "Bu işletmeyi düzenleme yetkiniz yok" });
+    }
+
+    if (vergiNoTrimmed) {
+      const { rows: existing } = await pool.query(
+        `SELECT id FROM businesses WHERE vergi_no = $1 AND id <> $2`,
+        [vergiNoTrimmed, req.params.id]
+      );
+      if (existing[0]) {
+        return res.status(409).json({ error: "Bu vergi numarasıyla kayıtlı başka bir işletme zaten var." });
+      }
+    }
+
+    const { rows } = await pool.query(
+      `UPDATE businesses
+       SET isletme_adi = $1, vergi_no = $2, vergi_dairesi = $3, telefon = $4, email = $5, sehir = $6, adres = $7
+       WHERE id = $8
+       RETURNING id, isletme_adi, vergi_no, vergi_dairesi, telefon, email, sehir, adres`,
+      [
+        isletme_adi,
+        vergiNoTrimmed || null,
+        vergi_dairesi || null,
+        telefon || null,
+        email || null,
+        sehir || null,
+        adres || null,
+        req.params.id,
+      ]
+    );
+    if (!rows[0]) {
+      return res.status(404).json({ error: "işletme bulunamadı" });
+    }
+    res.json(rows[0]);
+  } catch (err) {
+    if (err.code === "23505") {
+      return res.status(409).json({ error: "Bu vergi numarasıyla kayıtlı başka bir işletme zaten var." });
+    }
+    console.error(err);
+    res.status(500).json({ error: "işletme güncellenemedi" });
   }
 });
 

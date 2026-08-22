@@ -112,7 +112,7 @@ router.post("/chat", async (req, res) => {
             account_id: account.id,
             fatura_turu: "E-Fatura",
             kesim_tarihi: today,
-            kalemler: [{ aciklama: "Hizmet", miktar: 1, birim_fiyat: intent.amount, kdv_orani: 0 }],
+            kalemler: [{ aciklama: "Hizmet", miktar: 0, birim_fiyat: intent.amount, kdv_orani: 0 }],
           },
         },
       });

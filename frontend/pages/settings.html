@@ -115,16 +115,17 @@
                 </div>
 
                 <div data-tab-panel="profile" hidden>
-                    <form class="card form-card" data-demo-form data-toast="Firma profili kaydedildi">
+                    <form class="card form-card" id="form-firma-profil">
                         <div class="card-header"><h2>Firma Profil Bilgileri</h2></div>
+                        <p class="muted" id="firma-profil-readonly-note" hidden style="margin:0 0 16px;">Bu işletmeye müşavir olarak bağlısınız, bilgileri sadece işletme sahibi düzenleyebilir.</p>
                         <div class="form-grid">
-                            <div class="form-group"><label>İşletme Unvanı</label><input type="text" id="set-isletme" value="CepteFatura Demo" required></div>
-                            <div class="form-group"><label>Vergi / TC No</label><input type="text" value="1234567890"></div>
-                            <div class="form-group"><label>Vergi Dairesi</label><input type="text" value="Maslak"></div>
-                            <div class="form-group"><label>Telefon</label><input type="tel" value="0555 111 22 33"></div>
-                            <div class="form-group"><label>E-posta</label><input type="email" id="set-firma-email" value="info@ceptefatura.com"></div>
-                            <div class="form-group"><label>Şehir</label><input type="text" value="İstanbul"></div>
-                            <div class="form-group full"><label>Adres</label><input type="text" value="Maslak Mah. No:12"></div>
+                            <div class="form-group"><label>İşletme Unvanı</label><input type="text" id="set-isletme" required></div>
+                            <div class="form-group"><label>Vergi / TC No</label><input type="text" id="set-vergi-no" inputmode="numeric" maxlength="11" placeholder="10 haneli vergi no veya 11 haneli TC kimlik no"></div>
+                            <div class="form-group"><label>Vergi Dairesi</label><input type="text" id="set-vergi-dairesi"></div>
+                            <div class="form-group"><label>Telefon</label><input type="tel" id="set-firma-telefon"></div>
+                            <div class="form-group"><label>E-posta</label><input type="email" id="set-firma-email"></div>
+                            <div class="form-group"><label>Şehir</label><input type="text" id="set-firma-sehir"></div>
+                            <div class="form-group full"><label>Adres</label><input type="text" id="set-firma-adres"></div>
                         </div>
                         <div class="card-header" style="margin-top:8px;"><h2>Fatura tercihleri</h2></div>
                         <div class="form-grid">

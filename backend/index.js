@@ -11,8 +11,10 @@ const expenses = require("./routes/expenses");
 const businesses = require("./routes/businesses");
 const reports = require("./routes/reports");
 const assistant = require("./routes/assistant");
+const notifications = require("./routes/notifications");
 const { UPLOAD_DIR } = require("./middleware/upload");
 const { checkDbConnection, hasDatabaseUrl } = require("./db");
+const { startReminderScheduler } = require("./services/reminders");
 
 const FRONTEND = path.join(__dirname, "..", "frontend");
 
@@ -43,6 +45,7 @@ app.use("/api/expenses", expenses);
 app.use("/api/businesses", businesses);
 app.use("/api/reports", reports);
 app.use("/api/assistant", assistant);
+app.use("/api/notifications", notifications);
 
 app.use(express.static(FRONTEND));
 app.get("/", (_req, res) => {
@@ -56,6 +59,11 @@ app.listen(PORT, async () => {
   const db = await checkDbConnection();
   if (db.ok) {
     console.log("PostgreSQL bağlantısı başarılı.");
+    // Vadesi yaklaşan/geçen faturalar için hatırlatma taraması: açılışta bir
+    // kez, sonra düzenli aralıklarla. Test/geliştirmede daha sık çalışsın
+    // diye REMINDER_INTERVAL_MS ile ayarlanabilir (varsayılan: 1 saat).
+    const interval = Number(process.env.REMINDER_INTERVAL_MS) || 60 * 60 * 1000;
+    startReminderScheduler(interval);
   } else {
     console.warn(`PostgreSQL bağlantısı kurulamadı: ${db.reason}`);
     console.warn("Ekipte herkes backend/.env dosyasını kendi makinesinde oluşturmalı.");

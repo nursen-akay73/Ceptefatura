@@ -3,6 +3,21 @@
   <div class="mobile-title">CepteFatura</div>
   <div class="topbar-actions">
     <a class="btn btn-secondary invite-btn" href="accountant.html">Mali Müşavirinizi Davet Edin</a>
+    <div class="notif-menu" id="notif-menu">
+      <button type="button" class="icon-btn notif-bell" id="notif-bell" aria-label="Bildirimler">
+        <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 8a6 6 0 0 1 12 0c0 7 3 9 3 9H3s3-2 3-9"/><path d="M10.3 21a1.94 1.94 0 0 0 3.4 0"/></svg>
+        <span class="notif-badge" id="notif-badge" hidden>0</span>
+      </button>
+      <div class="notif-dropdown" id="notif-dropdown">
+        <div class="notif-dropdown-header">
+          <strong>Bildirimler</strong>
+          <button type="button" class="text-btn" id="notif-mark-all">Tümünü okundu yap</button>
+        </div>
+        <div class="notif-list" id="notif-list">
+          <p class="muted notif-empty">Yükleniyor…</p>
+        </div>
+      </div>
+    </div>
     <div class="user-menu" id="user-menu">
       <div class="avatar" id="user-avatar">N</div>
       <div><strong id="user-name">Nurşen</strong><small id="user-role">İşletme Yöneticisi</small></div>

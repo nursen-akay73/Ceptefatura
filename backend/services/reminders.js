@@ -25,8 +25,26 @@ async function markOverdueInvoices(client) {
 // Ödenen/kapanan faturalar için bekleyen hatırlatmaları temizler.
 // Faturayı 'Ödendi' yapan her yol (payment-callback, demo ödeme, PATCH ile
 // elle işaretleme) bunu çağırmalı.
+//
+// Bu, faturayı ödendi yapma işleminin YAN etkisidir — asıl işlem değildir.
+// `notifications` tablosu henüz oluşturulmamış bir ortamda (migration
+// uygulanmadan önce) bu satır patlarsa ödeme/durum güncellemesinin tamamı
+// başarısız görünmemeli; bu yüzden "tablo yok" hatasını (42P01) yutup
+// sadece logluyoruz. Başka türlü bir DB hatası olursa (bağlantı kopması
+// vb.) yine de yukarı fırlatılır.
 async function clearNotificationsForInvoice(invoiceId, db = pool) {
-  await db.query(`DELETE FROM notifications WHERE invoice_id = $1`, [invoiceId]);
+  try {
+    await db.query(`DELETE FROM notifications WHERE invoice_id = $1`, [invoiceId]);
+  } catch (err) {
+    if (err && err.code === "42P01") {
+      console.warn(
+        "notifications tablosu bulunamadı — migration henüz uygulanmamış olabilir. " +
+          "Bildirim temizleme atlandı, invoice_id=" + invoiceId
+      );
+      return;
+    }
+    throw err;
+  }
 }
 
 // Tek bir taramada: gecikmiş faturaları işaretle, yaklaşan/geciken faturalar

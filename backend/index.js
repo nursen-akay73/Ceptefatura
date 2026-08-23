@@ -14,6 +14,7 @@ const assistant = require("./routes/assistant");
 const notifications = require("./routes/notifications");
 const { UPLOAD_DIR } = require("./middleware/upload");
 const { checkDbConnection, hasDatabaseUrl } = require("./db");
+const { ensureSchema } = require("./ensureSchema");
 const { startReminderScheduler } = require("./services/reminders");
 
 const FRONTEND = path.join(__dirname, "..", "frontend");
@@ -53,12 +54,17 @@ app.get("/", (_req, res) => {
 });
 
 const PORT = process.env.PORT || 3000;
-const server = app.listen(PORT, async () => {
+const server = app.listen(PORT, "0.0.0.0", async () => {
   console.log(`Uygulama http://localhost:${PORT}`);
 
   const db = await checkDbConnection();
   if (db.ok) {
     console.log("PostgreSQL bağlantısı başarılı.");
+    try {
+      await ensureSchema();
+    } catch (err) {
+      console.warn("Şema güncellemesi atlandı:", err.message);
+    }
     const interval = Number(process.env.REMINDER_INTERVAL_MS) || 60 * 60 * 1000;
     startReminderScheduler(interval);
   } else {

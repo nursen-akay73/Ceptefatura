@@ -1,0 +1,16 @@
+services:
+  - type: web
+    name: ceptefatura
+    runtime: node
+    plan: free
+    region: frankfurt
+    buildCommand: npm install --prefix backend
+    startCommand: npm start
+    healthCheckPath: /api/health
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: DATABASE_URL
+        sync: false
+      - key: JWT_SECRET
+        generateValue: true

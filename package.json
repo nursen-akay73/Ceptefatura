@@ -1,6 +1,9 @@
 {
   "name": "ceptefatura",
   "private": true,
+  "engines": {
+    "node": "20.x"
+  },
   "scripts": {
     "dev": "npm run dev --prefix backend",
     "start": "npm start --prefix backend"

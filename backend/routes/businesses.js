@@ -4,18 +4,30 @@ const { requireAuth } = require("../middleware/auth");
 
 router.use(requireAuth);
 
-router.get("/", async (req, res) => {
-  try {
-    const { rows } = await pool.query(
-      `SELECT b.id, b.isletme_adi, b.vergi_no, b.vergi_dairesi, b.telefon, b.email, b.sehir, b.adres,
+const LIST_SQL = `SELECT b.id, b.isletme_adi, b.vergi_no, b.vergi_dairesi, b.telefon, b.email, b.sehir, b.adres,
               ub.role, ub.status
        FROM user_businesses ub
        JOIN businesses b ON b.id = ub.business_id
        WHERE ub.user_id = $1
-       ORDER BY (ub.status = 'beklemede'), (ub.role = 'sahip') DESC, b.isletme_adi`,
-      [req.userId]
-    );
-    res.json(rows);
+       ORDER BY (ub.status = 'beklemede'), (ub.role = 'sahip') DESC, b.isletme_adi`;
+
+const LIST_SQL_CORE = `SELECT b.id, b.isletme_adi, b.vergi_no, b.vergi_dairesi,
+              ub.role, ub.status
+       FROM user_businesses ub
+       JOIN businesses b ON b.id = ub.business_id
+       WHERE ub.user_id = $1
+       ORDER BY (ub.status = 'beklemede'), (ub.role = 'sahip') DESC, b.isletme_adi`;
+
+router.get("/", async (req, res) => {
+  try {
+    let result;
+    try {
+      result = await pool.query(LIST_SQL, [req.userId]);
+    } catch (err) {
+      if (err.code !== "42703") throw err;
+      result = await pool.query(LIST_SQL_CORE, [req.userId]);
+    }
+    res.json(result.rows);
   } catch (err) {
     console.error(err);
     res.status(500).json({ error: "işletmeler alınamadı" });

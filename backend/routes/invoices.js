@@ -92,14 +92,79 @@ function kalemTutar(k) {
   return Math.round(miktar * birim * (1 + kdv / 100) * 100) / 100;
 }
 
+// Türkiye'deki e-Fatura numaralandırma biçimi: 3 harfli seri kodu + yıl (4 hane)
+// + sıra numarası (9 hane) -- örn. "ylm2026000000001". Seri kodu HER İŞLETME
+// İÇİN o işletmenin kendi adından türetilir (asla sabit "ylm" değildir) --
+// örn. "Yılmaz" -> "ylm", "Zelal" -> "zll", "Mine" -> "min". Kural: harfler
+// soldan sağa taranır, sessiz harfler her zaman alınır; bir sesli harf ise,
+// yalnızca ondan SONRA gelen sessiz harf sayısı 3'ü tamamlamaya yetiyorsa
+// atlanır -- yetmiyorsa (ör. "Mine"de M'den sonra tek sessiz harf -N- kalır)
+// sesli harf de koda dahil edilir ki isim olduğu gibi tanınabilir kalsın.
+// İsimde hiç harf yoksa (veya 3'ten az harf varsa) "x" ile tamamlanır.
+// Gerçek e-Fatura "Fatura No" alanı yalnızca ASCII harf/rakam
+// içerebildiğinden, Türkçe'ye özgü harfler (ç, ğ, ı, i, ö, ş, ü) ASCII
+// karşılıklarına çevrilir.
+const TR_VOWELS = new Set(["A", "E", "I", "İ", "O", "Ö", "U", "Ü"]);
+const TR_TO_ASCII = { Ç: "c", Ğ: "g", I: "i", İ: "i", Ö: "o", Ş: "s", Ü: "u" };
+
+function faturaSeriKodu(isletmeAdi) {
+  const harfler = String(isletmeAdi || "")
+    .toLocaleUpperCase("tr-TR")
+    .replace(/[^A-ZÇĞİÖŞÜ]/g, "");
+
+  // suffixSessiz[i] = harfler[i..] içindeki sessiz harf sayısı
+  const suffixSessiz = new Array(harfler.length + 1).fill(0);
+  for (let i = harfler.length - 1; i >= 0; i--) {
+    suffixSessiz[i] = suffixSessiz[i + 1] + (TR_VOWELS.has(harfler[i]) ? 0 : 1);
+  }
+
+  let kod = "";
+  for (let i = 0; i < harfler.length && kod.length < 3; i++) {
+    const harf = harfler[i];
+    if (!TR_VOWELS.has(harf)) {
+      kod += harf;
+    } else if (kod.length + suffixSessiz[i + 1] < 3) {
+      // Bu sesli harfi atlarsak kalan sessiz harfler 3'ü tamamlamaya
+      // yetmeyecek -- o yüzden atlamadan koda ekliyoruz.
+      kod += harf;
+    }
+  }
+  kod = (kod + "xxx").slice(0, 3);
+  return kod
+    .split("")
+    .map((harf) => (TR_TO_ASCII[harf] || harf).toLowerCase())
+    .join("");
+}
+
 async function nextFaturaNo(businessId, db = pool) {
   const year = new Date().getFullYear();
+
+  const { rows: bizRows } = await db.query(
+    `SELECT isletme_adi FROM businesses WHERE id = $1`,
+    [businessId]
+  );
+  const prefix = faturaSeriKodu(bizRows[0] && bizRows[0].isletme_adi);
+
+  // Sıra numarasını mevcut faturalar arasındaki en yüksek numaradan DEĞİL,
+  // yalnızca artan ve asla azalmayan ayrı bir sayaç tablosundan (invoice_no_counters)
+  // türetiyoruz. Aksi halde (en yüksek numaralı fatura silindiğinde, ör.
+  // yanlışlıkla oluşturulmuş bir fatura), bir sonraki fatura o silinen
+  // numarayı ikinci kez üretir -- ki bu gerçek e-Fatura numaralarında kabul
+  // edilemez. Sayaç ON CONFLICT ile atomik olarak artırıldığından eşzamanlı
+  // istekler de (iki kullanıcı aynı anda fatura kesse bile) aynı numarayı
+  // asla iki kez üretemez.
   const { rows } = await db.query(
-    `SELECT COUNT(*)::int AS n FROM invoices
-     WHERE business_id = $1 AND EXTRACT(YEAR FROM kesim_tarihi) = $2`,
+    `INSERT INTO invoice_no_counters (business_id, yil, son_sira)
+     VALUES ($1, $2, 1)
+     ON CONFLICT (business_id, yil)
+     DO UPDATE SET son_sira = invoice_no_counters.son_sira + 1
+     RETURNING son_sira`,
     [businessId, year]
   );
-  return `INV-${year}-${String(rows[0].n + 1).padStart(3, "0")}`;
+
+  const siraNo = rows[0].son_sira;
+
+  return `${prefix}${year}${String(siraNo).padStart(9, "0")}`;
 }
 
 router.get("/", async (req, res) => {

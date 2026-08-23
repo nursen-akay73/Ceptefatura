@@ -216,3 +216,35 @@ create table if not exists notifications (
 
 create index if not exists notifications_business_durum_idx
   on notifications (business_id, durum, created_at desc);
+
+-- Türkiye e-Fatura numaralandırması (seri kodu + yıl + 9 haneli sıra no,
+-- bkz. backend/routes/invoices.js -> nextFaturaNo) için işletme+yıl bazında
+-- SADECE ARTAN bir sayaç. Sıra numarasını mevcut faturalar arasındaki en
+-- yüksek numaradan türetmek yerine bu tabloyu kullanıyoruz; çünkü en yüksek
+-- numaralı fatura silinirse (ör. yanlışlıkla oluşturulmuş bir fatura), "en
+-- yüksek numara" yeniden hesaplandığında geriler ve silinen numara bir
+-- sonraki faturada tekrar üretilir -- gerçek e-Fatura numaralarında bu kabul
+-- edilemez. Sayaç ON CONFLICT ile atomik arttırıldığından eşzamanlı istekler
+-- de aynı numarayı iki kez üretemez.
+create table if not exists invoice_no_counters (
+  business_id uuid not null references businesses(id) on delete cascade,
+  yil         integer not null,
+  son_sira    integer not null default 0,
+  primary key (business_id, yil)
+);
+
+-- Bu tablo daha önce yoktu; halihazırda yeni biçimde ("sss" + yıl + 9 haneli
+-- sıra, örn. "ylm2026000000002") fatura numarası üretilmiş işletmeler için
+-- sayacı, o işletme+yılda görülen en yüksek sıra numarasından başlatıyoruz.
+-- Böylece geçiş sırasında zaten var olan bir numarayla çakışan bir numara
+-- üretilmez. Idempotent: tekrar çalıştırılırsa sayaç asla geri düşürülmez
+-- (GREATEST), sadece ihtiyaç halinde ileri alınır.
+insert into invoice_no_counters (business_id, yil, son_sira)
+select business_id,
+       substring(fatura_no from 4 for 4)::int as yil,
+       max(substring(fatura_no from 8 for 9)::int) as son_sira
+from invoices
+where fatura_no ~ '^[a-z]{3}[0-9]{13}$'
+group by business_id, substring(fatura_no from 4 for 4)::int
+on conflict (business_id, yil) do update
+  set son_sira = greatest(invoice_no_counters.son_sira, excluded.son_sira);

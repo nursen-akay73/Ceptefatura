@@ -85,6 +85,7 @@ document.addEventListener("DOMContentLoaded", () => {
         target.querySelectorAll("a").forEach((a) => {
           a.addEventListener("click", () => document.body.classList.remove("nav-open"));
         });
+        applyRoleNav(getSessionUser());
       }
     });
 
@@ -97,6 +98,7 @@ document.addEventListener("DOMContentLoaded", () => {
         const menu = document.getElementById("user-menu");
         menu?.addEventListener("click", (e) => {
           e.stopPropagation();
+          if (e.target.closest(".user-dropdown")) return;
           menu.classList.toggle("open");
         });
         document.addEventListener("click", () => menu?.classList.remove("open"));
@@ -106,6 +108,7 @@ document.addEventListener("DOMContentLoaded", () => {
         });
         applyCompanyContext();
         applyUserMenu();
+        if (typeof initThemeToggle === "function") initThemeToggle();
         document.getElementById("logout-link")?.addEventListener("click", (e) => {
           e.preventDefault();
           clearSession();
@@ -552,6 +555,19 @@ function userInitial(name) {
   return ch ? ch.toLocaleUpperCase("tr-TR") : "N";
 }
 
+function isMusavir(user) {
+  return ((user && user.businesses) || []).some((b) => b.role === "musavir");
+}
+
+function applyRoleNav(user) {
+  const musavir = isMusavir(user);
+  document.querySelectorAll(".nav-musavir-only").forEach((el) => {
+    el.hidden = !musavir;
+  });
+  const invite = document.querySelector(".invite-btn");
+  if (invite) invite.hidden = musavir;
+}
+
 function paintUserMenu(user) {
   const full = (user && user.ad_soyad) || "Nurşen";
   const first = full.trim().split(/\s+/)[0] || "Nurşen";
@@ -567,6 +583,7 @@ function paintUserMenu(user) {
   if (avatar) avatar.textContent = userInitial(first);
   const sorumlu = document.getElementById("sorumlu-musavir");
   if (sorumlu) sorumlu.value = full;
+  applyRoleNav(user);
 }
 
 async function applyUserMenu() {
@@ -584,6 +601,9 @@ async function applyUserMenu() {
       saveSessionUser(data);
       paintUserMenu(data);
       fillSettingsUser(data);
+      if (document.body.dataset.page === "accountant" && !isMusavir(data)) {
+        window.location.replace("settings.html#account");
+      }
     }
   } catch {}
 }
@@ -685,8 +705,24 @@ function fillSettingsUser(user) {
   if (!user || document.body.dataset.page !== "settings") return;
   const name = document.getElementById("set-ad-soyad");
   const email = document.getElementById("set-email");
-  if (name && !name.dataset.dirty) name.value = user.ad_soyad || "";
+  const full = user.ad_soyad || "";
+  if (name && !name.dataset.dirty) name.value = full;
   if (email && !email.dataset.dirty) email.value = user.email || "";
+
+  const businesses = user.businesses || [];
+  const activeId = activeBusinessId() || user.activeBusinessId || "";
+  const active = businesses.find((b) => b.id === activeId) || businesses[0];
+  const role = active && active.role === "musavir" ? "Mali Müşavir" : "İşletme Yöneticisi";
+  const heroName = document.getElementById("set-hero-name");
+  const heroEmail = document.getElementById("set-hero-email");
+  const heroRole = document.getElementById("set-hero-role");
+  const heroAvatar = document.getElementById("set-avatar");
+  const rolInput = document.getElementById("set-rol");
+  if (heroName) heroName.textContent = full || "Hesabım";
+  if (heroEmail) heroEmail.textContent = user.email || "E-posta yok";
+  if (heroRole) heroRole.textContent = role;
+  if (heroAvatar) heroAvatar.textContent = userInitial(full || user.email || "?");
+  if (rolInput) rolInput.value = role;
 }
 
 const FIRMA_PROFIL_FIELDS = {

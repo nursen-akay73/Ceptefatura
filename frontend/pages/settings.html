@@ -4,6 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Ayarlar & Paketler | CepteFatura</title>
+    <script src="../assets/js/dark-mode.js"></script>
     <link rel="stylesheet" href="../assets/css/style.css">
     <link rel="icon" href="../assets/img/logo-icon.png">
 </head>
@@ -47,7 +48,7 @@
                             <h3>KOBİ Paketi</h3>
                             <p class="muted">Abonelikli & aktif KOBİ'ler için.</p>
                             <div style="font-size:24px; font-weight:700; margin:16px 0; color:var(--primary)">₺299 <small class="muted" style="font-size:12px; font-weight:500;">/ay</small></div>
-                            <ul style="padding-left:18px; line-height:1.8; color:#475569; font-size:13px;">
+                            <ul style="padding-left:18px; line-height:1.8; color:var(--muted); font-size:13px;">
                                 <li>Sınırsız Fatura Kesimi</li>
                                 <li>Otomatik Tekrarlayan Faturalar</li>
                                 <li>OCR Fiş Okuma & AI Kategori</li>
@@ -72,12 +73,21 @@
                 </div>
 
                 <div data-tab-panel="account" hidden>
-                    <form class="card form-card" id="form-account">
+                    <div class="card account-hero">
+                        <div class="account-hero-avatar" id="set-avatar">?</div>
+                        <div class="account-hero-meta">
+                            <h2 id="set-hero-name">Hesabım</h2>
+                            <p class="muted" id="set-hero-email">Giriş yapan kullanıcının bilgileri</p>
+                            <span class="badge info" id="set-hero-role">İşletme Yöneticisi</span>
+                        </div>
+                    </div>
+
+                    <form class="card form-card" id="form-account" style="margin-top:16px;">
                         <div class="card-header"><h2>Hesap bilgileri</h2></div>
                         <div class="form-grid">
                             <div class="form-group"><label>Ad Soyad</label><input type="text" id="set-ad-soyad" required></div>
                             <div class="form-group"><label>E-posta</label><input type="email" id="set-email" required></div>
-                            <div class="form-group"><label>Rol</label><input type="text" value="İşletme Yöneticisi" readonly></div>
+                            <div class="form-group"><label>Rol</label><input type="text" id="set-rol" value="İşletme Yöneticisi" readonly></div>
                             <div class="form-group"><label>Dil</label><select><option selected>Türkçe</option><option>English</option></select></div>
                             <div class="form-group">
                                 <label>Yeni şifre</label>

@@ -92,12 +92,18 @@ function kalemTutar(k) {
   return Math.round(miktar * birim * (1 + kdv / 100) * 100) / 100;
 }
 
-async function nextFaturaNo(businessId, db = pool) {
+async function nextFaturaNo(userId, db = pool) {
   const year = new Date().getFullYear();
+  await db.query("SELECT pg_advisory_xact_lock(hashtext($1::text))", [String(userId)]);
   const { rows } = await db.query(
-    `SELECT COUNT(*)::int AS n FROM invoices
-     WHERE business_id = $1 AND EXTRACT(YEAR FROM kesim_tarihi) = $2`,
-    [businessId, year]
+    `SELECT COALESCE(
+       MAX(CAST(split_part(fatura_no, '-', 3) AS integer)),
+       0
+     )::int AS n
+     FROM invoices
+     WHERE user_id = $1
+       AND fatura_no ~ $2`,
+    [userId, `^INV-${year}-[0-9]+$`]
   );
   return `INV-${year}-${String(rows[0].n + 1).padStart(3, "0")}`;
 }
@@ -290,7 +296,7 @@ router.post("/", async (req, res) => {
     }
 
     await client.query("BEGIN");
-    const faturaNo = await nextFaturaNo(req.businessId, client);
+    const faturaNo = await nextFaturaNo(req.userId, client);
     const items = kalemler.map((k) => ({
       aciklama: k.aciklama || "",
       miktar: Number(k.miktar || 1),

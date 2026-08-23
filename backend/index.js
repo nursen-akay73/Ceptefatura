@@ -53,19 +53,26 @@ app.get("/", (_req, res) => {
 });
 
 const PORT = process.env.PORT || 3000;
-app.listen(PORT, async () => {
+const server = app.listen(PORT, async () => {
   console.log(`Uygulama http://localhost:${PORT}`);
 
   const db = await checkDbConnection();
   if (db.ok) {
     console.log("PostgreSQL bağlantısı başarılı.");
-    // Vadesi yaklaşan/geçen faturalar için hatırlatma taraması: açılışta bir
-    // kez, sonra düzenli aralıklarla. Test/geliştirmede daha sık çalışsın
-    // diye REMINDER_INTERVAL_MS ile ayarlanabilir (varsayılan: 1 saat).
     const interval = Number(process.env.REMINDER_INTERVAL_MS) || 60 * 60 * 1000;
     startReminderScheduler(interval);
   } else {
     console.warn(`PostgreSQL bağlantısı kurulamadı: ${db.reason}`);
     console.warn("Ekipte herkes backend/.env dosyasını kendi makinesinde oluşturmalı.");
   }
+});
+
+server.on("error", (err) => {
+  if (err.code === "EADDRINUSE") {
+    console.error(`Port ${PORT} zaten dolu — sunucu muhtemelen çalışıyor.`);
+    console.error(`Tarayıcıda aç: http://localhost:${PORT}`);
+    console.error("Yeniden başlatmak için önce o terminalde Ctrl+C yap.");
+    process.exit(1);
+  }
+  throw err;
 });

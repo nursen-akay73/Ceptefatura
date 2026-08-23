@@ -248,3 +248,16 @@ where fatura_no ~ '^[a-z]{3}[0-9]{13}$'
 group by business_id, substring(fatura_no from 4 for 4)::int
 on conflict (business_id, yil) do update
   set son_sira = greatest(invoice_no_counters.son_sira, excluded.son_sira);
+
+-- e-Fatura görünümlü PDF çıktısında (bkz. backend/services/invoicePdf.js)
+-- "EFATURA CARİ" bölümünde cari'nin adresi ve vergi dairesi de gösteriliyor;
+-- accounts tablosunda bu iki alan yoktu. Doldurulmazlarsa PDF'te ilgili
+-- satır "-" olarak görünür, hata vermez.
+alter table accounts add column if not exists adres text;
+alter table accounts add column if not exists vergi_dairesi varchar(120);
+
+-- Fatura kalemlerine satır bazında iskonto desteği: kullanıcı bir iskonto
+-- oranı (%) girer, tutar bundan türetilir (kdv_orani'nin çalışma şekliyle
+-- aynı mantık). İskonto, KDV'den ÖNCE net tutardan düşülür (bkz.
+-- backend/routes/invoices.js -> kalemNetIskontolu / kalemTutar).
+alter table invoice_items add column if not exists iskonto_orani numeric(5, 2) not null default 0;

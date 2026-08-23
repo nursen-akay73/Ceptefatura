@@ -97,9 +97,10 @@
                     <table class="table" id="items-table">
                         <thead>
                             <tr>
-                                <th style="width:40%;">AÇIKLAMA</th>
+                                <th style="width:32%;">AÇIKLAMA</th>
                                 <th>MİKTAR</th>
                                 <th>BİRİM FİYAT (₺)</th>
+                                <th>İSKONTO %</th>
                                 <th>KDV %</th>
                                 <th class="money">TUTAR</th>
                                 <th></th>
@@ -115,6 +116,7 @@
                                 </td>
                                 <td><input class="table-input item-qty" type="number" value="0" min="1"></td>
                                 <td><input class="table-input item-price" type="number" value="0"></td>
+                                <td><input class="table-input item-iskonto" type="number" value="0" min="0" max="100"></td>
                                 <td>
                                     <select class="table-input item-vat">
                                         <option value="20" selected>%20</option>
@@ -132,6 +134,7 @@
 
                 <div class="totals-card" id="invoice-totals">
                     <div><span>Ara toplam</span><span id="sum-sub">₺8.750,00</span></div>
+                    <div><span>İskonto</span><span id="sum-iskonto">₺0,00</span></div>
                     <div><span>KDV</span><span id="sum-vat">₺1.750,00</span></div>
                     <div class="grand"><span>Genel toplam</span><span id="sum-grand">₺10.500,00</span></div>
                 </div>
@@ -199,23 +202,32 @@
             }
 
             function calculateTotals() {
-                let sub = 0, vat = 0;
+                // İskonto, KDV'den ÖNCE net tutardan düşülür -- backend'deki
+                // kalemNetIskontolu/kalemTutar ile aynı mantık (bkz.
+                // backend/routes/invoices.js), tutarlar tutsun diye.
+                let sub = 0, iskontoToplam = 0, vat = 0;
                 itemsBody.querySelectorAll('tr').forEach(row => {
                     const qty = parseFloat(row.querySelector('.item-qty').value) || 0;
                     const price = parseFloat(row.querySelector('.item-price').value) || 0;
+                    const iskontoRate = parseFloat(row.querySelector('.item-iskonto')?.value) || 0;
                     const rate = parseFloat(row.querySelector('.item-vat')?.value) || 0;
-                    const rowSub = qty * price;
-                    const rowVat = rowSub * rate / 100;
-                    sub += rowSub;
+                    const rowNet = qty * price;
+                    const rowIskonto = rowNet * iskontoRate / 100;
+                    const rowNetSonrasi = rowNet - rowIskonto;
+                    const rowVat = rowNetSonrasi * rate / 100;
+                    sub += rowNet;
+                    iskontoToplam += rowIskonto;
                     vat += rowVat;
-                    row.querySelector('.item-total').innerText = money(rowSub + rowVat);
+                    row.querySelector('.item-total').innerText = money(rowNetSonrasi + rowVat);
                 });
                 const subEl = document.getElementById('sum-sub');
+                const iskontoEl = document.getElementById('sum-iskonto');
                 const vatEl = document.getElementById('sum-vat');
                 const grandEl = document.getElementById('sum-grand');
                 if (subEl) subEl.textContent = money(sub);
+                if (iskontoEl) iskontoEl.textContent = money(iskontoToplam);
                 if (vatEl) vatEl.textContent = money(vat);
-                if (grandEl) grandEl.textContent = money(sub + vat);
+                if (grandEl) grandEl.textContent = money(sub - iskontoToplam + vat);
             }
             calculateTotals();
 
@@ -235,6 +247,7 @@
                 const desc = item.aciklama != null ? escapeHtml(String(item.aciklama)) : '';
                 const qty = item.miktar != null ? Number(item.miktar) : 1;
                 const price = item.birim_fiyat != null ? Number(item.birim_fiyat) : 0;
+                const iskonto = item.iskonto_orani != null ? Number(item.iskonto_orani) : 0;
                 const vat = item.kdv_orani != null ? Number(item.kdv_orani) : 20;
                 return `
               <td>
@@ -245,6 +258,7 @@
               </td>
               <td><input class="table-input item-qty" type="number" value="${qty}" min="1"></td>
               <td><input class="table-input item-price" type="number" value="${price}"></td>
+              <td><input class="table-input item-iskonto" type="number" value="${iskonto}" min="0" max="100"></td>
               <td>
                 <select class="table-input item-vat">
                   <option value="20"${vat === 20 ? ' selected' : ''}>%20</option>
@@ -361,6 +375,7 @@
                     aciklama: row.querySelector('.item-desc').value,
                     miktar: row.querySelector('.item-qty').value,
                     birim_fiyat: row.querySelector('.item-price').value,
+                    iskonto_orani: row.querySelector('.item-iskonto')?.value || 0,
                     kdv_orani: row.querySelector('.item-vat').value,
                 }));
 

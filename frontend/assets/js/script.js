@@ -335,21 +335,10 @@ document.addEventListener("DOMContentLoaded", () => {
       showToast("Rapor indirildi");
     }, 900);
   });
-  document.getElementById("btn-pdf-invoice")?.addEventListener("click", () => {
-    showToast("Rapor PDF olarak hazırlanıyor...");
-    const no = document.getElementById("m-fatura-no")?.textContent || "Fatura";
-    const cari = document.getElementById("m-cari")?.textContent || "";
-    const tutar = document.getElementById("m-toplam")?.textContent || "";
-    setTimeout(() => {
-      downloadSimplePdf(`${no}.pdf`, "CepteFatura Fatura Ozeti", [
-        "Fatura No: " + no,
-        "Cari: " + cari,
-        "Tutar: " + tutar,
-        "Durum: " + (document.getElementById("m-durum")?.textContent || ""),
-      ]);
-      showToast("Fatura özeti indirildi");
-    }, 700);
-  });
+  // NOT: fatura detay modalındaki "PDF İndir" butonu artık burada değil,
+  // invoices.html / incoming-invoices.html kendi içinde currentInvoiceId'yi
+  // bilerek downloadInvoicePdf()'i çağırıyor (gerçek, sunucu tarafında
+  // üretilen e-Fatura görünümlü PDF için fatura id'si gerekiyor).
 
   document.addEventListener("click", (e) => {
     const btn = e.target.closest(".js-switch-company");
@@ -545,6 +534,41 @@ async function apiFetch(path, opts = {}) {
     throw err;
   }
   return data;
+}
+
+// Sunucu tarafında (backend/services/invoicePdf.js) üretilen, Türk e-Fatura
+// görünümündeki gerçek PDF'i indirir. apiFetch kullanılmıyor çünkü o hep
+// res.json() bekliyor; burada blob (dosya) indiriyoruz.
+async function downloadInvoicePdf(invoiceId) {
+  const token = localStorage.getItem("token");
+  const headers = {};
+  if (token) headers.Authorization = "Bearer " + token;
+  const bizId = activeBusinessId();
+  if (bizId) headers["X-Business-Id"] = bizId;
+
+  const res = await fetch(`/api/invoices/${invoiceId}/pdf`, { headers });
+  if (!res.ok) {
+    let message = "PDF indirilemedi";
+    try {
+      const data = await res.json();
+      if (data && data.error) message = data.error;
+    } catch {}
+    throw new Error(message);
+  }
+
+  const disposition = res.headers.get("Content-Disposition") || "";
+  const match = disposition.match(/filename="(.+?)"/);
+  const filename = match ? match[1] : `${invoiceId}.pdf`;
+
+  const blob = await res.blob();
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = filename;
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  setTimeout(() => URL.revokeObjectURL(url), 1000);
 }
 
 function userInitial(name) {

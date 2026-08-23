@@ -169,9 +169,11 @@
             <div class="modal-body">
                 <div class="detail-grid">
                     <div><strong>Vergi Numarası:</strong> <br><span id="m-account-vno">1234567890</span></div>
+                    <div><strong>Vergi Dairesi:</strong> <br><span id="m-account-taxoffice">—</span></div>
                     <div><strong>Güncel Bakiye:</strong> <br><span id="m-account-balance" class="money" style="font-weight:600;">₺25.000,00</span> <span id="m-account-status" class="badge credit">Alacak</span></div>
                     <div><strong>Telefon:</strong> <br><span id="m-account-phone">0555 111 22 33</span></div>
                     <div><strong>E-Posta:</strong> <br><span id="m-account-email">info@abcteknoloji.com</span></div>
+                    <div style="grid-column: 1 / -1;"><strong>Adres:</strong> <br><span id="m-account-adres">—</span></div>
                 </div>
             </div>
             <div style="display:flex; justify-content:flex-end; gap:10px; margin-top:20px; border-top:1px solid #f1f5f9; padding-top:12px;">
@@ -205,6 +207,14 @@
                             <label style="font-weight:600;">Vergi / TC No</label>
                             <input class="table-input" id="new-vno" placeholder="10 veya 11 haneli">
                         </div>
+                    </div>
+                    <div class="form-group">
+                        <label style="font-weight:600;">Vergi Dairesi</label>
+                        <input class="table-input" id="new-taxoffice" placeholder="Vergi / TC No girildiyse zorunlu">
+                    </div>
+                    <div class="form-group">
+                        <label style="font-weight:600;">Adres *</label>
+                        <input class="table-input" id="new-adres" required placeholder="Faturada görünecek açık adres">
                     </div>
                     <div style="display:grid; grid-template-columns:1fr 1fr; gap:10px;">
                         <div class="form-group">
@@ -309,8 +319,10 @@
                 document.getElementById('m-account-name').innerText = acc.cari_adi;
                 document.getElementById('m-account-role').innerText = turLabel;
                 document.getElementById('m-account-vno').innerText = acc.vergi_no || '—';
+                document.getElementById('m-account-taxoffice').innerText = acc.vergi_dairesi || '—';
                 document.getElementById('m-account-phone').innerText = acc.telefon || '—';
                 document.getElementById('m-account-email').innerText = acc.email || '—';
+                document.getElementById('m-account-adres').innerText = acc.adres || '—';
                 document.getElementById('m-account-balance').innerText = money(acc.bakiye);
                 const statusEl = document.getElementById('m-account-status');
                 if (statusEl) {
@@ -344,13 +356,24 @@
                 const cari_adi = document.getElementById('new-name').value.trim();
                 const turu = document.getElementById('new-role').value;
                 const vergi_no = document.getElementById('new-vno').value.trim();
+                const vergi_dairesi = document.getElementById('new-taxoffice').value.trim();
+                const adres = document.getElementById('new-adres').value.trim();
                 const telefon = document.getElementById('new-phone').value.trim();
                 const email = document.getElementById('new-email').value.trim();
+
+                if (!adres) {
+                    showToast('Adres zorunlu', 'error');
+                    return;
+                }
+                if ((vergi_no && !vergi_dairesi) || (!vergi_no && vergi_dairesi)) {
+                    showToast('Vergi no ve vergi dairesi birlikte girilmeli', 'error');
+                    return;
+                }
 
                 try {
                     await apiFetch('/api/accounts', {
                         method: 'POST',
-                        body: { cari_adi, turu, vergi_no, telefon, email },
+                        body: { cari_adi, turu, vergi_no, vergi_dairesi, adres, telefon, email },
                     });
                     showToast('Yeni cari hesap kaydedildi');
                     hideNewModal();

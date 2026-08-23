@@ -4,8 +4,24 @@ const jwt = require("jsonwebtoken");
 const { pool } = require("../db");
 const { requireAuth, ensureDefaultBusiness } = require("../middleware/auth");
 
+// Diğer ön muhasebe/e-fatura uygulamalarında (Paraşüt, Logo, Mikro, Uyumsoft
+// vb.) da kayıt sırasında zorunlu tutulan, GİB e-Fatura'nın da satıcı bilgisi
+// olarak aradığı temel kimlik bilgileri: vergi no/TCKN, vergi dairesi, adres,
+// telefon. Eskiden yalnızca kayıttan sonra Ayarlar sayfasından, isteğe bağlı
+// olarak girilebiliyorlardı; artık işletmenin gerçek bir fatura kesebilmesi
+// için zaten şart oldukları için en baştan (kayıt formunda) zorunlu.
 router.post("/register", async (req, res) => {
-  const { ad_soyad, isletme_adi, email, sifre, sifre_tekrar, vergi_no } = req.body || {};
+  const {
+    ad_soyad,
+    isletme_adi,
+    email,
+    sifre,
+    sifre_tekrar,
+    vergi_no,
+    vergi_dairesi,
+    telefon,
+    adres,
+  } = req.body || {};
 
   if (!ad_soyad || !isletme_adi || !email || !sifre) {
     return res.status(400).json({ error: "ad_soyad, isletme_adi, email, sifre zorunlu" });
@@ -14,22 +30,29 @@ router.post("/register", async (req, res) => {
     return res.status(400).json({ error: "şifreler eşleşmiyor" });
   }
   const vergiNoTrimmed = vergi_no ? String(vergi_no).trim() : "";
-  if (vergiNoTrimmed && !/^\d{10,11}$/.test(vergiNoTrimmed)) {
+  if (!vergiNoTrimmed) {
+    return res.status(400).json({ error: "vergi no / TC kimlik no zorunlu" });
+  }
+  if (!/^\d{10,11}$/.test(vergiNoTrimmed)) {
     return res.status(400).json({ error: "vergi no 10 haneli vergi numarası veya 11 haneli TC kimlik no olmalı" });
+  }
+  const vergiDairesiTrimmed = vergi_dairesi ? String(vergi_dairesi).trim() : "";
+  const telefonTrimmed = telefon ? String(telefon).trim() : "";
+  const adresTrimmed = adres ? String(adres).trim() : "";
+  if (!vergiDairesiTrimmed || !telefonTrimmed || !adresTrimmed) {
+    return res.status(400).json({ error: "vergi dairesi, telefon ve adres zorunlu" });
   }
 
   const client = await pool.connect();
   try {
-    if (vergiNoTrimmed) {
-      const { rows: existingBiz } = await client.query(
-        `SELECT id FROM businesses WHERE vergi_no = $1`,
-        [vergiNoTrimmed]
-      );
-      if (existingBiz[0]) {
-        return res.status(409).json({
-          error: "Bu vergi numarasıyla kayıtlı bir işletme zaten var. Giriş yapmayı deneyin ya da işletme sahibinden Muhasebeci Paneli'nden sizi müşavir olarak eklemesini isteyin.",
-        });
-      }
+    const { rows: existingBiz } = await client.query(
+      `SELECT id FROM businesses WHERE vergi_no = $1`,
+      [vergiNoTrimmed]
+    );
+    if (existingBiz[0]) {
+      return res.status(409).json({
+        error: "Bu vergi numarasıyla kayıtlı bir işletme zaten var. Giriş yapmayı deneyin ya da işletme sahibinden Muhasebeci Paneli'nden sizi müşavir olarak eklemesini isteyin.",
+      });
     }
 
     const sifreHash = await bcrypt.hash(sifre, 10);
@@ -44,8 +67,9 @@ router.post("/register", async (req, res) => {
     const user = rows[0];
 
     const { rows: businessRows } = await client.query(
-      `INSERT INTO businesses (isletme_adi, vergi_no) VALUES ($1, $2) RETURNING id`,
-      [isletme_adi, vergiNoTrimmed || null]
+      `INSERT INTO businesses (isletme_adi, vergi_no, vergi_dairesi, telefon, adres)
+       VALUES ($1, $2, $3, $4, $5) RETURNING id`,
+      [isletme_adi, vergiNoTrimmed, vergiDairesiTrimmed, telefonTrimmed, adresTrimmed]
     );
     const businessId = businessRows[0].id;
 

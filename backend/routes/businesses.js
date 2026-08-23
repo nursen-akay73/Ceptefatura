@@ -8,6 +8,7 @@ router.get("/", async (req, res) => {
   try {
     const { rows } = await pool.query(
       `SELECT b.id, b.isletme_adi, b.vergi_no, b.vergi_dairesi, b.telefon, b.email, b.sehir, b.adres,
+              b.mersis_no, b.ticaret_sicil_no, b.kep_adresi, b.iban,
               ub.role, ub.status
        FROM user_businesses ub
        JOIN businesses b ON b.id = ub.business_id
@@ -165,14 +166,43 @@ router.post("/", async (req, res) => {
 
 // Ayarlar → Firma Profil Bilgileri sekmesinden gerçek işletme kaydını günceller.
 // Sadece işletmenin onaylanmış sahibi düzenleyebilir (müşavir salt-okunur görür).
+// Diğer ön muhasebe uygulamalarıyla aynı doğrulama: vergi no, vergi dairesi,
+// telefon ve adres olmadan gerçek bir fatura kesilemeyeceği için bu alanlar
+// da isletme_adi gibi zorunlu (bkz. auth.js -> POST /register). MERSİS no,
+// ticaret sicil no, KEP adresi ve IBAN opsiyonel kalıyor: yalnızca sermaye
+// şirketlerinde bulunur ya da her firmada zorunlu değildir.
 router.patch("/:id", async (req, res) => {
-  const { isletme_adi, vergi_no, vergi_dairesi, telefon, email, sehir, adres } = req.body || {};
+  const {
+    isletme_adi,
+    vergi_no,
+    vergi_dairesi,
+    telefon,
+    email,
+    sehir,
+    adres,
+    mersis_no,
+    ticaret_sicil_no,
+    kep_adresi,
+    iban,
+  } = req.body || {};
   if (!isletme_adi) {
     return res.status(400).json({ error: "isletme_adi zorunlu" });
   }
   const vergiNoTrimmed = vergi_no ? String(vergi_no).trim() : "";
-  if (vergiNoTrimmed && !/^\d{10,11}$/.test(vergiNoTrimmed)) {
+  if (!vergiNoTrimmed) {
+    return res.status(400).json({ error: "vergi no / TC kimlik no zorunlu" });
+  }
+  if (!/^\d{10,11}$/.test(vergiNoTrimmed)) {
     return res.status(400).json({ error: "vergi no 10 haneli vergi numarası veya 11 haneli TC kimlik no olmalı" });
+  }
+  if (!vergi_dairesi || !String(vergi_dairesi).trim()) {
+    return res.status(400).json({ error: "vergi dairesi zorunlu" });
+  }
+  if (!telefon || !String(telefon).trim()) {
+    return res.status(400).json({ error: "telefon zorunlu" });
+  }
+  if (!adres || !String(adres).trim()) {
+    return res.status(400).json({ error: "adres zorunlu" });
   }
 
   try {
@@ -197,17 +227,23 @@ router.patch("/:id", async (req, res) => {
 
     const { rows } = await pool.query(
       `UPDATE businesses
-       SET isletme_adi = $1, vergi_no = $2, vergi_dairesi = $3, telefon = $4, email = $5, sehir = $6, adres = $7
-       WHERE id = $8
-       RETURNING id, isletme_adi, vergi_no, vergi_dairesi, telefon, email, sehir, adres`,
+       SET isletme_adi = $1, vergi_no = $2, vergi_dairesi = $3, telefon = $4, email = $5, sehir = $6, adres = $7,
+           mersis_no = $8, ticaret_sicil_no = $9, kep_adresi = $10, iban = $11
+       WHERE id = $12
+       RETURNING id, isletme_adi, vergi_no, vergi_dairesi, telefon, email, sehir, adres,
+                 mersis_no, ticaret_sicil_no, kep_adresi, iban`,
       [
         isletme_adi,
-        vergiNoTrimmed || null,
-        vergi_dairesi || null,
-        telefon || null,
+        vergiNoTrimmed,
+        String(vergi_dairesi).trim(),
+        String(telefon).trim(),
         email || null,
         sehir || null,
-        adres || null,
+        String(adres).trim(),
+        mersis_no ? String(mersis_no).trim() : null,
+        ticaret_sicil_no ? String(ticaret_sicil_no).trim() : null,
+        kep_adresi ? String(kep_adresi).trim() : null,
+        iban ? String(iban).trim() : null,
         req.params.id,
       ]
     );

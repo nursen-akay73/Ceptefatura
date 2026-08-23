@@ -721,7 +721,23 @@ const FIRMA_PROFIL_FIELDS = {
   "set-firma-email": "email",
   "set-firma-sehir": "sehir",
   "set-firma-adres": "adres",
+  "set-mersis-no": "mersis_no",
+  "set-ticaret-sicil-no": "ticaret_sicil_no",
+  "set-kep-adresi": "kep_adresi",
+  "set-iban": "iban",
 };
+
+// Diğer ön muhasebe uygulamalarında da kayıt/profil sırasında zorunlu tutulan,
+// GİB e-Fatura'nın satıcı bilgisi olarak aradığı alanlar (bkz. auth.js
+// register route'undaki aynı doğrulama). MERSİS/ticaret sicil no/KEP/IBAN
+// bilerek bu listede yok: yalnızca sermaye şirketlerinde bulunur ya da tüm
+// firmalarda zorunlu değildir.
+const FIRMA_PROFIL_REQUIRED_FIELDS = [
+  "set-vergi-no",
+  "set-vergi-dairesi",
+  "set-firma-telefon",
+  "set-firma-adres",
+];
 
 async function loadFirmaProfil() {
   const form = document.getElementById("form-firma-profil");
@@ -805,6 +821,11 @@ function initSettingsPage() {
     const isletmeAdi = document.getElementById("set-isletme")?.value.trim();
     if (!isletmeAdi) {
       showToast("İşletme unvanı zorunlu", "error");
+      return;
+    }
+    const eksikAlan = FIRMA_PROFIL_REQUIRED_FIELDS.find((id) => !document.getElementById(id)?.value.trim());
+    if (eksikAlan) {
+      showToast("Vergi no, vergi dairesi, telefon ve adres zorunlu", "error");
       return;
     }
     const body = { isletme_adi: isletmeAdi };

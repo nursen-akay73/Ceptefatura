@@ -261,3 +261,17 @@ alter table accounts add column if not exists vergi_dairesi varchar(120);
 -- aynı mantık). İskonto, KDV'den ÖNCE net tutardan düşülür (bkz.
 -- backend/routes/invoices.js -> kalemNetIskontolu / kalemTutar).
 alter table invoice_items add column if not exists iskonto_orani numeric(5, 2) not null default 0;
+
+-- Diğer ön muhasebe/e-fatura uygulamalarıyla (Paraşüt, Logo, Mikro, Uyumsoft
+-- vb.) kıyaslandığında bizde hiç bulunmayan, yaygın olarak istenen firma
+-- kimlik bilgileri. Hepsi opsiyonel tutuluyor çünkü MERSİS/ticaret sicil no
+-- yalnızca sermaye şirketlerinde (A.Ş., Ltd. Şti.) bulunur, şahıs
+-- firmalarında olmayabilir:
+--   mersis_no        -> Merkezi Sicil Kayıt Sistemi numarası
+--   ticaret_sicil_no -> Ticaret sicil no
+--   kep_adresi       -> Kayıtlı elektronik posta (e-tebligat) adresi
+--   iban             -> Faturada gösterilecek banka/IBAN bilgisi
+alter table businesses add column if not exists mersis_no varchar(20);
+alter table businesses add column if not exists ticaret_sicil_no varchar(60);
+alter table businesses add column if not exists kep_adresi varchar(160);
+alter table businesses add column if not exists iban varchar(34);

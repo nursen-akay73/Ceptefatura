@@ -120,12 +120,16 @@
                         <p class="muted" id="firma-profil-readonly-note" hidden style="margin:0 0 16px;">Bu işletmeye müşavir olarak bağlısınız, bilgileri sadece işletme sahibi düzenleyebilir.</p>
                         <div class="form-grid">
                             <div class="form-group"><label>İşletme Unvanı</label><input type="text" id="set-isletme" required></div>
-                            <div class="form-group"><label>Vergi / TC No</label><input type="text" id="set-vergi-no" inputmode="numeric" maxlength="11" placeholder="10 haneli vergi no veya 11 haneli TC kimlik no"></div>
-                            <div class="form-group"><label>Vergi Dairesi</label><input type="text" id="set-vergi-dairesi"></div>
-                            <div class="form-group"><label>Telefon</label><input type="tel" id="set-firma-telefon"></div>
+                            <div class="form-group"><label>Vergi / TC No</label><input type="text" id="set-vergi-no" inputmode="numeric" maxlength="11" placeholder="10 haneli vergi no veya 11 haneli TC kimlik no" required></div>
+                            <div class="form-group"><label>Vergi Dairesi</label><input type="text" id="set-vergi-dairesi" required></div>
+                            <div class="form-group"><label>Telefon</label><input type="tel" id="set-firma-telefon" required></div>
                             <div class="form-group"><label>E-posta</label><input type="email" id="set-firma-email"></div>
                             <div class="form-group"><label>Şehir</label><input type="text" id="set-firma-sehir"></div>
-                            <div class="form-group full"><label>Adres</label><input type="text" id="set-firma-adres"></div>
+                            <div class="form-group full"><label>Adres</label><input type="text" id="set-firma-adres" required></div>
+                            <div class="form-group"><label>MERSİS No</label><input type="text" id="set-mersis-no" placeholder="Yalnızca sermaye şirketlerinde (A.Ş., Ltd. Şti.) bulunur"></div>
+                            <div class="form-group"><label>Ticaret Sicil No</label><input type="text" id="set-ticaret-sicil-no"></div>
+                            <div class="form-group"><label>KEP Adresi</label><input type="email" id="set-kep-adresi" placeholder="ornek@hs01.kep.tr"></div>
+                            <div class="form-group"><label>IBAN</label><input type="text" id="set-iban" placeholder="TR__ ____ ____ ____ ____ ____ __"></div>
                         </div>
                         <div class="card-header" style="margin-top:8px;"><h2>Fatura tercihleri</h2></div>
                         <div class="form-grid">

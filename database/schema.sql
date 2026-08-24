@@ -244,7 +244,7 @@ select business_id,
        substring(fatura_no from 4 for 4)::int as yil,
        max(substring(fatura_no from 8 for 9)::int) as son_sira
 from invoices
-where fatura_no ~ '^[a-z]{3}[0-9]{13}$'
+where fatura_no ~* '^[a-z]{3}[0-9]{13}$'
 group by business_id, substring(fatura_no from 4 for 4)::int
 on conflict (business_id, yil) do update
   set son_sira = greatest(invoice_no_counters.son_sira, excluded.son_sira);

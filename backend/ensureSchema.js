@@ -1,4 +1,5 @@
 const { pool, hasDatabaseUrl } = require("./db");
+const { faturaSeriKodu, formatFaturaNo } = require("./lib/faturaNo");
 
 const STATEMENTS = [
   `ALTER TABLE businesses ADD COLUMN IF NOT EXISTS telefon varchar(30)`,
@@ -35,17 +36,52 @@ const STATEMENTS = [
           substring(fatura_no from 4 for 4)::int AS yil,
           max(substring(fatura_no from 8 for 9)::int) AS son_sira
    FROM invoices
-   WHERE fatura_no ~ '^[a-z]{3}[0-9]{13}$'
+   WHERE fatura_no ~* '^[a-z]{3}[0-9]{13}$'
    GROUP BY business_id, substring(fatura_no from 4 for 4)::int
    ON CONFLICT (business_id, yil) DO UPDATE
      SET son_sira = GREATEST(invoice_no_counters.son_sira, excluded.son_sira)`,
 ];
+
+async function uppercaseGibFaturaNolari() {
+  await pool.query(`
+    UPDATE invoices
+    SET fatura_no = upper(fatura_no)
+    WHERE fatura_no ~ '^[a-z]{3}[0-9]{13}$'
+  `);
+}
+
+async function migrateInvFaturaNolari() {
+  const { rows } = await pool.query(`
+    SELECT i.id, i.business_id, b.isletme_adi,
+           EXTRACT(YEAR FROM i.kesim_tarihi)::int AS yil
+    FROM invoices i
+    JOIN businesses b ON b.id = i.business_id
+    WHERE i.fatura_no ~ '^INV-[0-9]{4}-[0-9]+$'
+    ORDER BY i.business_id, i.kesim_tarihi NULLS LAST, i.created_at, i.id
+  `);
+
+  for (const row of rows) {
+    const prefix = faturaSeriKodu(row.isletme_adi);
+    const { rows: counterRows } = await pool.query(
+      `INSERT INTO invoice_no_counters (business_id, yil, son_sira)
+       VALUES ($1, $2, 1)
+       ON CONFLICT (business_id, yil)
+       DO UPDATE SET son_sira = invoice_no_counters.son_sira + 1
+       RETURNING son_sira`,
+      [row.business_id, row.yil]
+    );
+    const faturaNo = formatFaturaNo(prefix, row.yil, counterRows[0].son_sira);
+    await pool.query(`UPDATE invoices SET fatura_no = $1 WHERE id = $2`, [faturaNo, row.id]);
+  }
+}
 
 async function ensureSchema() {
   if (!hasDatabaseUrl) return;
   for (const sql of STATEMENTS) {
     await pool.query(sql);
   }
+  await uppercaseGibFaturaNolari();
+  await migrateInvFaturaNolari();
 }
 
 module.exports = { ensureSchema };

@@ -8,6 +8,7 @@ const { extractInvoiceFromDocument } = require("../services/documentScan");
 const { getClient: getIyzicoClient, isConfigured: isIyzicoConfigured } = require("../lib/iyzico");
 const { clearNotificationsForInvoice } = require("../services/reminders");
 const { buildInvoicePdf } = require("../services/invoicePdf");
+const { faturaSeriKodu, formatFaturaNo } = require("../lib/faturaNo");
 
 const TURLER = ["E-Fatura", "E-Arşiv"];
 const DURUMLAR = ["Ödendi", "Bekliyor", "Gecikti"];
@@ -104,48 +105,17 @@ function kalemTutar(k) {
 }
 
 // Türkiye'deki e-Fatura numaralandırma biçimi: 3 harfli seri kodu + yıl (4 hane)
-// + sıra numarası (9 hane) -- örn. "ylm2026000000001". Seri kodu HER İŞLETME
-// İÇİN o işletmenin kendi adından türetilir (asla sabit "ylm" değildir) --
-// örn. "Yılmaz" -> "ylm", "Zelal" -> "zll", "Mine" -> "min". Kural: harfler
+// + sıra numarası (9 hane) -- örn. "YLM2026000000001". Seri kodu HER İŞLETME
+// İÇİN o işletmenin kendi adından türetilir (asla sabit "YLM" değildir) --
+// örn. "Yılmaz" -> "YLM", "Zelal" -> "ZLL", "Mine" -> "MIN". Kural: harfler
 // soldan sağa taranır, sessiz harfler her zaman alınır; bir sesli harf ise,
 // yalnızca ondan SONRA gelen sessiz harf sayısı 3'ü tamamlamaya yetiyorsa
 // atlanır -- yetmiyorsa (ör. "Mine"de M'den sonra tek sessiz harf -N- kalır)
 // sesli harf de koda dahil edilir ki isim olduğu gibi tanınabilir kalsın.
-// İsimde hiç harf yoksa (veya 3'ten az harf varsa) "x" ile tamamlanır.
+// İsimde hiç harf yoksa (veya 3'ten az harf varsa) "X" ile tamamlanır.
 // Gerçek e-Fatura "Fatura No" alanı yalnızca ASCII harf/rakam
 // içerebildiğinden, Türkçe'ye özgü harfler (ç, ğ, ı, i, ö, ş, ü) ASCII
 // karşılıklarına çevrilir.
-const TR_VOWELS = new Set(["A", "E", "I", "İ", "O", "Ö", "U", "Ü"]);
-const TR_TO_ASCII = { Ç: "c", Ğ: "g", I: "i", İ: "i", Ö: "o", Ş: "s", Ü: "u" };
-
-function faturaSeriKodu(isletmeAdi) {
-  const harfler = String(isletmeAdi || "")
-    .toLocaleUpperCase("tr-TR")
-    .replace(/[^A-ZÇĞİÖŞÜ]/g, "");
-
-  // suffixSessiz[i] = harfler[i..] içindeki sessiz harf sayısı
-  const suffixSessiz = new Array(harfler.length + 1).fill(0);
-  for (let i = harfler.length - 1; i >= 0; i--) {
-    suffixSessiz[i] = suffixSessiz[i + 1] + (TR_VOWELS.has(harfler[i]) ? 0 : 1);
-  }
-
-  let kod = "";
-  for (let i = 0; i < harfler.length && kod.length < 3; i++) {
-    const harf = harfler[i];
-    if (!TR_VOWELS.has(harf)) {
-      kod += harf;
-    } else if (kod.length + suffixSessiz[i + 1] < 3) {
-      // Bu sesli harfi atlarsak kalan sessiz harfler 3'ü tamamlamaya
-      // yetmeyecek -- o yüzden atlamadan koda ekliyoruz.
-      kod += harf;
-    }
-  }
-  kod = (kod + "xxx").slice(0, 3);
-  return kod
-    .split("")
-    .map((harf) => (TR_TO_ASCII[harf] || harf).toLowerCase())
-    .join("");
-}
 
 async function nextFaturaNo(businessId, db = pool) {
   const year = new Date().getFullYear();
@@ -175,7 +145,7 @@ async function nextFaturaNo(businessId, db = pool) {
 
   const siraNo = rows[0].son_sira;
 
-  return `${prefix}${year}${String(siraNo).padStart(9, "0")}`;
+  return formatFaturaNo(prefix, year, siraNo);
 }
 
 router.get("/", async (req, res) => {

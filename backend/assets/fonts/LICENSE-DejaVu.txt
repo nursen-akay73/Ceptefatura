@@ -1,0 +1,9 @@
+DejaVu fonts (DejaVuSans.ttf, DejaVuSans-Bold.ttf) — kaynak: DejaVu Fonts
+projesi (Bitstream Vera Fonts türevi). Serbestçe kullanım, değiştirme ve
+üretilen belgelere gömme dahil dağıtım için ücretsiz ve açık lisans altında
+sunulur. Tam lisans metni: https://dejavu-fonts.github.io/License.html
+
+Bu fontlar, faturalarda Türkçe karakterlerin (ç, ğ, ı, İ, ö, ş, ü) PDF'in her
+görüntüleyicisinde doğru görünmesi için PDF içine gömülür (pdfkit'in
+varsayılan Helvetica gibi standart fontları Türkçe'ye özgü karakterleri
+içermez).

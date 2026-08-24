@@ -184,6 +184,7 @@
                         <tr style="background:#f8fafc;">
                             <th>Hizmet / Ürün</th>
                             <th>Miktar</th>
+                            <th>İskonto</th>
                             <th>KDV</th>
                             <th>Tutar</th>
                         </tr>
@@ -290,7 +291,20 @@
             const closeModal = document.getElementById('closeModal');
             const closeModalBtn = document.getElementById('closeModalBtn');
             const payBtn = document.getElementById('btn-pay-invoice');
+            const pdfBtn = document.getElementById('btn-pdf-invoice');
             let currentInvoiceId = null;
+
+            pdfBtn?.addEventListener('click', async function () {
+                if (!currentInvoiceId) return;
+                pdfBtn.disabled = true;
+                try {
+                    await downloadInvoicePdf(currentInvoiceId);
+                } catch (err) {
+                    showToast(err.message || 'PDF indirilemedi', 'error');
+                } finally {
+                    pdfBtn.disabled = false;
+                }
+            });
 
             async function openDetail(id) {
                 try {
@@ -312,11 +326,15 @@
                     kalemlerBody.innerHTML = '';
                     (inv.kalemler || []).forEach((k) => {
                         const tr = document.createElement('tr');
-                        tr.innerHTML = `<td></td><td></td><td></td><td></td>`;
+                        tr.innerHTML = `<td></td><td></td><td></td><td></td><td></td>`;
+                        const iskontoOrani = Number(k.iskonto_orani || 0);
+                        const net = Number(k.miktar || 0) * Number(k.birim_fiyat || 0);
+                        const iskontoTutar = net * iskontoOrani / 100;
                         tr.children[0].textContent = k.aciklama;
                         tr.children[1].textContent = k.miktar + ' Adet';
-                        tr.children[2].textContent = '%' + k.kdv_orani;
-                        tr.children[3].textContent = money(k.tutar);
+                        tr.children[2].textContent = iskontoOrani > 0 ? ('%' + iskontoOrani + ' (' + money(iskontoTutar) + ')') : '—';
+                        tr.children[3].textContent = '%' + k.kdv_orani;
+                        tr.children[4].textContent = money(k.tutar);
                         kalemlerBody.appendChild(tr);
                     });
 

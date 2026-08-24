@@ -7,6 +7,7 @@ const { upload } = require("../middleware/upload");
 const { extractInvoiceFromDocument } = require("../services/documentScan");
 const { getClient: getIyzicoClient, isConfigured: isIyzicoConfigured } = require("../lib/iyzico");
 const { clearNotificationsForInvoice } = require("../services/reminders");
+const { buildInvoicePdf } = require("../services/invoicePdf");
 
 const TURLER = ["E-Fatura", "E-Arşiv"];
 const DURUMLAR = ["Ödendi", "Bekliyor", "Gecikti"];
@@ -85,27 +86,96 @@ router.post("/scan", upload.single("belge"), async (req, res) => {
   }
 });
 
-function kalemTutar(k) {
+// İskonto, KDV'den ÖNCE net tutardan düşülür (gerçek fatura mantığı budur):
+// önce miktar*birim_fiyat net tutarı bulunur, ondan iskonto_orani düşülür,
+// KDV bu İSKONTOLU tutar üzerinden hesaplanır.
+function kalemNetIskontolu(k) {
   const miktar = Number(k.miktar || 1);
   const birim = Number(k.birim_fiyat || 0);
-  const kdv = Number(k.kdv_orani ?? 20);
-  return Math.round(miktar * birim * (1 + kdv / 100) * 100) / 100;
+  const iskontoOrani = Number(k.iskonto_orani || 0);
+  const net = miktar * birim;
+  return Math.round(net * (1 - iskontoOrani / 100) * 100) / 100;
 }
 
-async function nextFaturaNo(userId, db = pool) {
+function kalemTutar(k) {
+  const kdv = Number(k.kdv_orani ?? 20);
+  const netIskontolu = kalemNetIskontolu(k);
+  return Math.round(netIskontolu * (1 + kdv / 100) * 100) / 100;
+}
+
+// Türkiye'deki e-Fatura numaralandırma biçimi: 3 harfli seri kodu + yıl (4 hane)
+// + sıra numarası (9 hane) -- örn. "ylm2026000000001". Seri kodu HER İŞLETME
+// İÇİN o işletmenin kendi adından türetilir (asla sabit "ylm" değildir) --
+// örn. "Yılmaz" -> "ylm", "Zelal" -> "zll", "Mine" -> "min". Kural: harfler
+// soldan sağa taranır, sessiz harfler her zaman alınır; bir sesli harf ise,
+// yalnızca ondan SONRA gelen sessiz harf sayısı 3'ü tamamlamaya yetiyorsa
+// atlanır -- yetmiyorsa (ör. "Mine"de M'den sonra tek sessiz harf -N- kalır)
+// sesli harf de koda dahil edilir ki isim olduğu gibi tanınabilir kalsın.
+// İsimde hiç harf yoksa (veya 3'ten az harf varsa) "x" ile tamamlanır.
+// Gerçek e-Fatura "Fatura No" alanı yalnızca ASCII harf/rakam
+// içerebildiğinden, Türkçe'ye özgü harfler (ç, ğ, ı, i, ö, ş, ü) ASCII
+// karşılıklarına çevrilir.
+const TR_VOWELS = new Set(["A", "E", "I", "İ", "O", "Ö", "U", "Ü"]);
+const TR_TO_ASCII = { Ç: "c", Ğ: "g", I: "i", İ: "i", Ö: "o", Ş: "s", Ü: "u" };
+
+function faturaSeriKodu(isletmeAdi) {
+  const harfler = String(isletmeAdi || "")
+    .toLocaleUpperCase("tr-TR")
+    .replace(/[^A-ZÇĞİÖŞÜ]/g, "");
+
+  // suffixSessiz[i] = harfler[i..] içindeki sessiz harf sayısı
+  const suffixSessiz = new Array(harfler.length + 1).fill(0);
+  for (let i = harfler.length - 1; i >= 0; i--) {
+    suffixSessiz[i] = suffixSessiz[i + 1] + (TR_VOWELS.has(harfler[i]) ? 0 : 1);
+  }
+
+  let kod = "";
+  for (let i = 0; i < harfler.length && kod.length < 3; i++) {
+    const harf = harfler[i];
+    if (!TR_VOWELS.has(harf)) {
+      kod += harf;
+    } else if (kod.length + suffixSessiz[i + 1] < 3) {
+      // Bu sesli harfi atlarsak kalan sessiz harfler 3'ü tamamlamaya
+      // yetmeyecek -- o yüzden atlamadan koda ekliyoruz.
+      kod += harf;
+    }
+  }
+  kod = (kod + "xxx").slice(0, 3);
+  return kod
+    .split("")
+    .map((harf) => (TR_TO_ASCII[harf] || harf).toLowerCase())
+    .join("");
+}
+
+async function nextFaturaNo(businessId, db = pool) {
   const year = new Date().getFullYear();
-  await db.query("SELECT pg_advisory_xact_lock(hashtext($1::text))", [String(userId)]);
-  const { rows } = await db.query(
-    `SELECT COALESCE(
-       MAX(CAST(split_part(fatura_no, '-', 3) AS integer)),
-       0
-     )::int AS n
-     FROM invoices
-     WHERE user_id = $1
-       AND fatura_no ~ $2`,
-    [userId, `^INV-${year}-[0-9]+$`]
+
+  const { rows: bizRows } = await db.query(
+    `SELECT isletme_adi FROM businesses WHERE id = $1`,
+    [businessId]
   );
-  return `INV-${year}-${String(rows[0].n + 1).padStart(3, "0")}`;
+  const prefix = faturaSeriKodu(bizRows[0] && bizRows[0].isletme_adi);
+
+  // Sıra numarasını mevcut faturalar arasındaki en yüksek numaradan DEĞİL,
+  // yalnızca artan ve asla azalmayan ayrı bir sayaç tablosundan (invoice_no_counters)
+  // türetiyoruz. Aksi halde (en yüksek numaralı fatura silindiğinde, ör.
+  // yanlışlıkla oluşturulmuş bir fatura), bir sonraki fatura o silinen
+  // numarayı ikinci kez üretir -- ki bu gerçek e-Fatura numaralarında kabul
+  // edilemez. Sayaç ON CONFLICT ile atomik olarak artırıldığından eşzamanlı
+  // istekler de (iki kullanıcı aynı anda fatura kesse bile) aynı numarayı
+  // asla iki kez üretemez.
+  const { rows } = await db.query(
+    `INSERT INTO invoice_no_counters (business_id, yil, son_sira)
+     VALUES ($1, $2, 1)
+     ON CONFLICT (business_id, yil)
+     DO UPDATE SET son_sira = invoice_no_counters.son_sira + 1
+     RETURNING son_sira`,
+    [businessId, year]
+  );
+
+  const siraNo = rows[0].son_sira;
+
+  return `${prefix}${year}${String(siraNo).padStart(9, "0")}`;
 }
 
 router.get("/", async (req, res) => {
@@ -261,7 +331,7 @@ router.get("/:id", async (req, res) => {
       return res.status(404).json({ error: "fatura bulunamadı" });
     }
     const { rows: kalemler } = await pool.query(
-      `SELECT id, aciklama, miktar, birim_fiyat, kdv_orani, tutar
+      `SELECT id, aciklama, miktar, birim_fiyat, kdv_orani, iskonto_orani, tutar
        FROM invoice_items WHERE invoice_id = $1`,
       [req.params.id]
     );
@@ -269,6 +339,68 @@ router.get("/:id", async (req, res) => {
   } catch (err) {
     console.error(err);
     res.status(500).json({ error: "fatura detayı alınamadı" });
+  }
+});
+
+// Türk e-Fatura çıktısına benzer görünümde bir PDF üretip indirir. Yetki
+// kontrolü GET /:id ile birebir aynı: hem faturayı kesen işletme hem de
+// (vergi no eşleşmesiyle) faturayı alan işletme PDF'i indirebilir.
+router.get("/:id/pdf", async (req, res) => {
+  try {
+    const { rows: invoices } = await pool.query(
+      `SELECT i.*, a.cari_adi, a.vergi_no AS cari_vergi_no, a.adres AS cari_adres,
+              a.vergi_dairesi AS cari_vergi_dairesi,
+              b.isletme_adi AS firma_isletme_adi, b.adres AS firma_adres, b.sehir AS firma_sehir,
+              b.vergi_no AS firma_vergi_no, b.vergi_dairesi AS firma_vergi_dairesi
+       FROM invoices i
+       JOIN accounts a ON a.id = i.account_id
+       JOIN businesses b ON b.id = i.business_id
+       WHERE i.id = $1
+         AND (
+           i.business_id = $2
+           OR a.vergi_no = (SELECT vergi_no FROM businesses WHERE id = $2)
+         )`,
+      [req.params.id, req.businessId]
+    );
+    const inv = invoices[0];
+    if (!inv) {
+      return res.status(404).json({ error: "fatura bulunamadı" });
+    }
+    const { rows: kalemler } = await pool.query(
+      `SELECT aciklama, miktar, birim_fiyat, kdv_orani, iskonto_orani
+       FROM invoice_items WHERE invoice_id = $1`,
+      [req.params.id]
+    );
+
+    const pdfBuffer = await buildInvoicePdf({
+      firma: {
+        isletme_adi: inv.firma_isletme_adi,
+        adres: inv.firma_adres,
+        sehir: inv.firma_sehir,
+        vergi_no: inv.firma_vergi_no,
+        vergi_dairesi: inv.firma_vergi_dairesi,
+      },
+      cari: {
+        cari_adi: inv.cari_adi,
+        adres: inv.cari_adres,
+        vergi_no: inv.cari_vergi_no,
+        vergi_dairesi: inv.cari_vergi_dairesi,
+      },
+      fatura_no: inv.fatura_no,
+      fatura_turu: inv.fatura_turu,
+      kesim_tarihi: inv.kesim_tarihi,
+      created_at: inv.created_at,
+      fatura_notu: inv.fatura_notu,
+      ettn: String(inv.id).toUpperCase(),
+      kalemler,
+    });
+
+    res.setHeader("Content-Type", "application/pdf");
+    res.setHeader("Content-Disposition", `attachment; filename="${inv.fatura_no}.pdf"`);
+    res.send(pdfBuffer);
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: "fatura PDF'i oluşturulamadı" });
   }
 });
 
@@ -296,12 +428,13 @@ router.post("/", async (req, res) => {
     }
 
     await client.query("BEGIN");
-    const faturaNo = await nextFaturaNo(req.userId, client);
+    const faturaNo = await nextFaturaNo(req.businessId, client);
     const items = kalemler.map((k) => ({
       aciklama: k.aciklama || "",
       miktar: Number(k.miktar || 1),
       birim_fiyat: Number(k.birim_fiyat || 0),
       kdv_orani: Number(k.kdv_orani ?? 20),
+      iskonto_orani: Number(k.iskonto_orani || 0),
       tutar: kalemTutar(k),
     }));
     const tutar = items.reduce((s, k) => s + k.tutar, 0);
@@ -328,9 +461,9 @@ router.post("/", async (req, res) => {
 
     for (const k of items) {
       await client.query(
-        `INSERT INTO invoice_items (invoice_id, aciklama, miktar, birim_fiyat, kdv_orani, tutar)
-         VALUES ($1, $2, $3, $4, $5, $6)`,
-        [invoice.id, k.aciklama, k.miktar, k.birim_fiyat, k.kdv_orani, k.tutar]
+        `INSERT INTO invoice_items (invoice_id, aciklama, miktar, birim_fiyat, kdv_orani, iskonto_orani, tutar)
+         VALUES ($1, $2, $3, $4, $5, $6, $7)`,
+        [invoice.id, k.aciklama, k.miktar, k.birim_fiyat, k.kdv_orani, k.iskonto_orani, k.tutar]
       );
     }
 
@@ -401,6 +534,7 @@ router.patch("/:id", async (req, res) => {
         miktar: Number(k.miktar || 1),
         birim_fiyat: Number(k.birim_fiyat || 0),
         kdv_orani: Number(k.kdv_orani ?? 20),
+        iskonto_orani: Number(k.iskonto_orani || 0),
         tutar: kalemTutar(k),
       }));
       tutar = items.reduce((s, k) => s + k.tutar, 0);
@@ -408,9 +542,9 @@ router.patch("/:id", async (req, res) => {
       await client.query(`DELETE FROM invoice_items WHERE invoice_id = $1`, [req.params.id]);
       for (const k of items) {
         await client.query(
-          `INSERT INTO invoice_items (invoice_id, aciklama, miktar, birim_fiyat, kdv_orani, tutar)
-           VALUES ($1, $2, $3, $4, $5, $6)`,
-          [req.params.id, k.aciklama, k.miktar, k.birim_fiyat, k.kdv_orani, k.tutar]
+          `INSERT INTO invoice_items (invoice_id, aciklama, miktar, birim_fiyat, kdv_orani, iskonto_orani, tutar)
+           VALUES ($1, $2, $3, $4, $5, $6, $7)`,
+          [req.params.id, k.aciklama, k.miktar, k.birim_fiyat, k.kdv_orani, k.iskonto_orani, k.tutar]
         );
       }
     }
@@ -432,7 +566,7 @@ router.patch("/:id", async (req, res) => {
 
     if (!items) {
       const { rows: kalemler } = await pool.query(
-        `SELECT id, aciklama, miktar, birim_fiyat, kdv_orani, tutar FROM invoice_items WHERE invoice_id = $1`,
+        `SELECT id, aciklama, miktar, birim_fiyat, kdv_orani, iskonto_orani, tutar FROM invoice_items WHERE invoice_id = $1`,
         [req.params.id]
       );
       items = kalemler;

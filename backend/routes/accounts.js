@@ -20,7 +20,7 @@ router.get("/", async (req, res) => {
 
   try {
     const { rows } = await pool.query(
-      `SELECT id, cari_adi, turu, vergi_no, telefon, email, bakiye, branch_id, created_at
+      `SELECT id, cari_adi, turu, vergi_no, vergi_dairesi, adres, telefon, email, bakiye, branch_id, created_at
        FROM accounts
        WHERE ${where}
        ORDER BY cari_adi`,
@@ -36,7 +36,7 @@ router.get("/", async (req, res) => {
 router.get("/:id", async (req, res) => {
   try {
     const { rows } = await pool.query(
-      `SELECT id, cari_adi, turu, vergi_no, telefon, email, bakiye, branch_id, created_at
+      `SELECT id, cari_adi, turu, vergi_no, vergi_dairesi, adres, telefon, email, bakiye, branch_id, created_at
        FROM accounts WHERE id = $1 AND business_id = $2`,
       [req.params.id, req.businessId]
     );
@@ -48,16 +48,32 @@ router.get("/:id", async (req, res) => {
   }
 });
 
+// e-Fatura/e-Arşiv'de alıcı (cari) bilgisi olarak adres zorunlu; vergi no
+// girilmişse eşlik eden vergi dairesi de zorunlu (biri boş, diğeri dolu
+// olamaz) -- diğer ön muhasebe uygulamalarındaki cari kartı doğrulamasıyla
+// aynı mantık (bkz. businesses.js -> PATCH /:id).
+function validateCariFields(body) {
+  const { cari_adi, vergi_no, vergi_dairesi, adres } = body || {};
+  if (!cari_adi) return "cari_adi zorunlu";
+  if (!adres || !String(adres).trim()) return "adres zorunlu";
+  const vergiNoTrimmed = vergi_no ? String(vergi_no).trim() : "";
+  const vergiDairesiTrimmed = vergi_dairesi ? String(vergi_dairesi).trim() : "";
+  if (vergiNoTrimmed && !vergiDairesiTrimmed) return "vergi no girildiyse vergi dairesi de zorunlu";
+  if (vergiDairesiTrimmed && !vergiNoTrimmed) return "vergi dairesi girildiyse vergi no da zorunlu";
+  return null;
+}
+
 router.post("/", async (req, res) => {
-  const { cari_adi, turu, vergi_no, telefon, email, branch_id } = req.body || {};
-  if (!cari_adi) {
-    return res.status(400).json({ error: "cari_adi zorunlu" });
+  const { cari_adi, turu, vergi_no, vergi_dairesi, adres, telefon, email, branch_id } = req.body || {};
+  const validationError = validateCariFields(req.body);
+  if (validationError) {
+    return res.status(400).json({ error: validationError });
   }
 
   try {
     const { rows } = await pool.query(
-      `INSERT INTO accounts (user_id, business_id, branch_id, cari_adi, turu, vergi_no, telefon, email)
-       VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+      `INSERT INTO accounts (user_id, business_id, branch_id, cari_adi, turu, vergi_no, vergi_dairesi, adres, telefon, email)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
        RETURNING *`,
       [
         req.userId,
@@ -65,7 +81,9 @@ router.post("/", async (req, res) => {
         branch_id || null,
         cari_adi,
         turu || null,
-        vergi_no || null,
+        vergi_no ? String(vergi_no).trim() : null,
+        vergi_dairesi ? String(vergi_dairesi).trim() : null,
+        String(adres).trim(),
         telefon || null,
         email || null,
       ]
@@ -78,21 +96,24 @@ router.post("/", async (req, res) => {
 });
 
 router.patch("/:id", async (req, res) => {
-  const { cari_adi, turu, vergi_no, telefon, email, branch_id } = req.body || {};
-  if (!cari_adi) {
-    return res.status(400).json({ error: "cari_adi zorunlu" });
+  const { cari_adi, turu, vergi_no, vergi_dairesi, adres, telefon, email, branch_id } = req.body || {};
+  const validationError = validateCariFields(req.body);
+  if (validationError) {
+    return res.status(400).json({ error: validationError });
   }
 
   try {
     const { rows } = await pool.query(
       `UPDATE accounts
-       SET cari_adi = $1, turu = $2, vergi_no = $3, telefon = $4, email = $5, branch_id = $6
-       WHERE id = $7 AND business_id = $8
-       RETURNING id, cari_adi, turu, vergi_no, telefon, email, bakiye, branch_id, created_at`,
+       SET cari_adi = $1, turu = $2, vergi_no = $3, vergi_dairesi = $4, adres = $5, telefon = $6, email = $7, branch_id = $8
+       WHERE id = $9 AND business_id = $10
+       RETURNING id, cari_adi, turu, vergi_no, vergi_dairesi, adres, telefon, email, bakiye, branch_id, created_at`,
       [
         cari_adi,
         turu || null,
-        vergi_no || null,
+        vergi_no ? String(vergi_no).trim() : null,
+        vergi_dairesi ? String(vergi_dairesi).trim() : null,
+        String(adres).trim(),
         telefon || null,
         email || null,
         branch_id || null,

@@ -216,3 +216,62 @@ create table if not exists notifications (
 
 create index if not exists notifications_business_durum_idx
   on notifications (business_id, durum, created_at desc);
+
+-- Türkiye e-Fatura numaralandırması (seri kodu + yıl + 9 haneli sıra no,
+-- bkz. backend/routes/invoices.js -> nextFaturaNo) için işletme+yıl bazında
+-- SADECE ARTAN bir sayaç. Sıra numarasını mevcut faturalar arasındaki en
+-- yüksek numaradan türetmek yerine bu tabloyu kullanıyoruz; çünkü en yüksek
+-- numaralı fatura silinirse (ör. yanlışlıkla oluşturulmuş bir fatura), "en
+-- yüksek numara" yeniden hesaplandığında geriler ve silinen numara bir
+-- sonraki faturada tekrar üretilir -- gerçek e-Fatura numaralarında bu kabul
+-- edilemez. Sayaç ON CONFLICT ile atomik arttırıldığından eşzamanlı istekler
+-- de aynı numarayı iki kez üretemez.
+create table if not exists invoice_no_counters (
+  business_id uuid not null references businesses(id) on delete cascade,
+  yil         integer not null,
+  son_sira    integer not null default 0,
+  primary key (business_id, yil)
+);
+
+-- Bu tablo daha önce yoktu; halihazırda yeni biçimde ("sss" + yıl + 9 haneli
+-- sıra, örn. "ylm2026000000002") fatura numarası üretilmiş işletmeler için
+-- sayacı, o işletme+yılda görülen en yüksek sıra numarasından başlatıyoruz.
+-- Böylece geçiş sırasında zaten var olan bir numarayla çakışan bir numara
+-- üretilmez. Idempotent: tekrar çalıştırılırsa sayaç asla geri düşürülmez
+-- (GREATEST), sadece ihtiyaç halinde ileri alınır.
+insert into invoice_no_counters (business_id, yil, son_sira)
+select business_id,
+       substring(fatura_no from 4 for 4)::int as yil,
+       max(substring(fatura_no from 8 for 9)::int) as son_sira
+from invoices
+where fatura_no ~ '^[a-z]{3}[0-9]{13}$'
+group by business_id, substring(fatura_no from 4 for 4)::int
+on conflict (business_id, yil) do update
+  set son_sira = greatest(invoice_no_counters.son_sira, excluded.son_sira);
+
+-- e-Fatura görünümlü PDF çıktısında (bkz. backend/services/invoicePdf.js)
+-- "EFATURA CARİ" bölümünde cari'nin adresi ve vergi dairesi de gösteriliyor;
+-- accounts tablosunda bu iki alan yoktu. Doldurulmazlarsa PDF'te ilgili
+-- satır "-" olarak görünür, hata vermez.
+alter table accounts add column if not exists adres text;
+alter table accounts add column if not exists vergi_dairesi varchar(120);
+
+-- Fatura kalemlerine satır bazında iskonto desteği: kullanıcı bir iskonto
+-- oranı (%) girer, tutar bundan türetilir (kdv_orani'nin çalışma şekliyle
+-- aynı mantık). İskonto, KDV'den ÖNCE net tutardan düşülür (bkz.
+-- backend/routes/invoices.js -> kalemNetIskontolu / kalemTutar).
+alter table invoice_items add column if not exists iskonto_orani numeric(5, 2) not null default 0;
+
+-- Diğer ön muhasebe/e-fatura uygulamalarıyla (Paraşüt, Logo, Mikro, Uyumsoft
+-- vb.) kıyaslandığında bizde hiç bulunmayan, yaygın olarak istenen firma
+-- kimlik bilgileri. Hepsi opsiyonel tutuluyor çünkü MERSİS/ticaret sicil no
+-- yalnızca sermaye şirketlerinde (A.Ş., Ltd. Şti.) bulunur, şahıs
+-- firmalarında olmayabilir:
+--   mersis_no        -> Merkezi Sicil Kayıt Sistemi numarası
+--   ticaret_sicil_no -> Ticaret sicil no
+--   kep_adresi       -> Kayıtlı elektronik posta (e-tebligat) adresi
+--   iban             -> Faturada gösterilecek banka/IBAN bilgisi
+alter table businesses add column if not exists mersis_no varchar(20);
+alter table businesses add column if not exists ticaret_sicil_no varchar(60);
+alter table businesses add column if not exists kep_adresi varchar(160);
+alter table businesses add column if not exists iban varchar(34);

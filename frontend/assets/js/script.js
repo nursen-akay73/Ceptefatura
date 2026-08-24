@@ -338,21 +338,10 @@ document.addEventListener("DOMContentLoaded", () => {
       showToast("Rapor indirildi");
     }, 900);
   });
-  document.getElementById("btn-pdf-invoice")?.addEventListener("click", () => {
-    showToast("Rapor PDF olarak hazırlanıyor...");
-    const no = document.getElementById("m-fatura-no")?.textContent || "Fatura";
-    const cari = document.getElementById("m-cari")?.textContent || "";
-    const tutar = document.getElementById("m-toplam")?.textContent || "";
-    setTimeout(() => {
-      downloadSimplePdf(`${no}.pdf`, "CepteFatura Fatura Ozeti", [
-        "Fatura No: " + no,
-        "Cari: " + cari,
-        "Tutar: " + tutar,
-        "Durum: " + (document.getElementById("m-durum")?.textContent || ""),
-      ]);
-      showToast("Fatura özeti indirildi");
-    }, 700);
-  });
+  // NOT: fatura detay modalındaki "PDF İndir" butonu artık burada değil,
+  // invoices.html / incoming-invoices.html kendi içinde currentInvoiceId'yi
+  // bilerek downloadInvoicePdf()'i çağırıyor (gerçek, sunucu tarafında
+  // üretilen e-Fatura görünümlü PDF için fatura id'si gerekiyor).
 
   document.addEventListener("click", (e) => {
     const btn = e.target.closest(".js-switch-company");
@@ -550,6 +539,41 @@ async function apiFetch(path, opts = {}) {
   return data;
 }
 
+// Sunucu tarafında (backend/services/invoicePdf.js) üretilen, Türk e-Fatura
+// görünümündeki gerçek PDF'i indirir. apiFetch kullanılmıyor çünkü o hep
+// res.json() bekliyor; burada blob (dosya) indiriyoruz.
+async function downloadInvoicePdf(invoiceId) {
+  const token = localStorage.getItem("token");
+  const headers = {};
+  if (token) headers.Authorization = "Bearer " + token;
+  const bizId = activeBusinessId();
+  if (bizId) headers["X-Business-Id"] = bizId;
+
+  const res = await fetch(`/api/invoices/${invoiceId}/pdf`, { headers });
+  if (!res.ok) {
+    let message = "PDF indirilemedi";
+    try {
+      const data = await res.json();
+      if (data && data.error) message = data.error;
+    } catch {}
+    throw new Error(message);
+  }
+
+  const disposition = res.headers.get("Content-Disposition") || "";
+  const match = disposition.match(/filename="(.+?)"/);
+  const filename = match ? match[1] : `${invoiceId}.pdf`;
+
+  const blob = await res.blob();
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = filename;
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  setTimeout(() => URL.revokeObjectURL(url), 1000);
+}
+
 function userInitial(name) {
   const ch = String(name || "N").trim().charAt(0);
   return ch ? ch.toLocaleUpperCase("tr-TR") : "N";
@@ -733,7 +757,23 @@ const FIRMA_PROFIL_FIELDS = {
   "set-firma-email": "email",
   "set-firma-sehir": "sehir",
   "set-firma-adres": "adres",
+  "set-mersis-no": "mersis_no",
+  "set-ticaret-sicil-no": "ticaret_sicil_no",
+  "set-kep-adresi": "kep_adresi",
+  "set-iban": "iban",
 };
+
+// Diğer ön muhasebe uygulamalarında da kayıt/profil sırasında zorunlu tutulan,
+// GİB e-Fatura'nın satıcı bilgisi olarak aradığı alanlar (bkz. auth.js
+// register route'undaki aynı doğrulama). MERSİS/ticaret sicil no/KEP/IBAN
+// bilerek bu listede yok: yalnızca sermaye şirketlerinde bulunur ya da tüm
+// firmalarda zorunlu değildir.
+const FIRMA_PROFIL_REQUIRED_FIELDS = [
+  "set-vergi-no",
+  "set-vergi-dairesi",
+  "set-firma-telefon",
+  "set-firma-adres",
+];
 
 async function loadFirmaProfil() {
   const form = document.getElementById("form-firma-profil");
@@ -817,6 +857,11 @@ function initSettingsPage() {
     const isletmeAdi = document.getElementById("set-isletme")?.value.trim();
     if (!isletmeAdi) {
       showToast("İşletme unvanı zorunlu", "error");
+      return;
+    }
+    const eksikAlan = FIRMA_PROFIL_REQUIRED_FIELDS.find((id) => !document.getElementById(id)?.value.trim());
+    if (eksikAlan) {
+      showToast("Vergi no, vergi dairesi, telefon ve adres zorunlu", "error");
       return;
     }
     const body = { isletme_adi: isletmeAdi };

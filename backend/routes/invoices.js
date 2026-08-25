@@ -6,7 +6,7 @@ const { requireAuth, resolveBusinessContext } = require("../middleware/auth");
 const { upload } = require("../middleware/upload");
 const { extractInvoiceFromDocument } = require("../services/documentScan");
 const { getClient: getIyzicoClient, isConfigured: isIyzicoConfigured } = require("../lib/iyzico");
-const { clearNotificationsForInvoice } = require("../services/reminders");
+const { clearNotificationsForInvoice, sweepOnce } = require("../services/reminders");
 const { buildInvoicePdf } = require("../services/invoicePdf");
 const { faturaSeriKodu, formatFaturaNo } = require("../lib/faturaNo");
 
@@ -77,8 +77,13 @@ router.post("/scan", upload.single("belge"), async (req, res) => {
   }
   try {
     const fileBuffer = fs.readFileSync(req.file.path);
-    const extracted = await extractInvoiceFromDocument(fileBuffer, req.file.mimetype);
-    res.json(extracted);
+    const extracted = await extractInvoiceFromDocument(
+      fileBuffer,
+      req.file.mimetype,
+      req.file.originalname
+    );
+    const { _raw_text, ...payload } = extracted;
+    res.json(payload);
   } catch (err) {
     console.error(err);
     res.status(err.status || 500).json({ error: err.message || "Görüntü işlenemedi" });
@@ -411,8 +416,8 @@ router.post("/", async (req, res) => {
 
     const { rows } = await client.query(
       `INSERT INTO invoices
-         (user_id, business_id, branch_id, account_id, fatura_no, fatura_turu, kesim_tarihi, vade_tarihi, fatura_notu, tutar)
-       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
+         (user_id, business_id, branch_id, account_id, fatura_no, fatura_turu, kesim_tarihi, vade_tarihi, fatura_notu, tutar, durum)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, 'Bekliyor')
        RETURNING *`,
       [
         req.userId,
@@ -438,6 +443,11 @@ router.post("/", async (req, res) => {
     }
 
     await client.query("COMMIT");
+    try {
+      await sweepOnce(req.businessId);
+    } catch (err) {
+      console.error("Fatura sonrası hatırlatma taraması:", err);
+    }
     res.status(201).json({ ...invoice, kalemler: items });
   } catch (err) {
     await client.query("ROLLBACK");
@@ -532,6 +542,12 @@ router.patch("/:id", async (req, res) => {
 
     if (durum === "Ödendi") {
       await clearNotificationsForInvoice(req.params.id);
+    } else {
+      try {
+        await sweepOnce(req.businessId);
+      } catch (err) {
+        console.error("Fatura güncelleme sonrası hatırlatma taraması:", err);
+      }
     }
 
     if (!items) {
@@ -593,25 +609,17 @@ router.post("/:id/payment", async (req, res) => {
 
     const price = Number(invoice.tutar).toFixed(2);
 
-    // iyzico anahtarı yoksa demo ödeme: faturayı Ödendi yap.
-    // Production'da anahtar eksikse sessizce "ödendi" göstermek yerine hata dön.
+    // DEMO: iyzico anahtarı yokken ödeme panelini göstermek için.
+    // Canlıya geçince bu bloğu silin; alttaki checkoutFormInitialize kalsın.
     if (!isIyzicoConfigured()) {
       if (process.env.NODE_ENV === "production") {
         return res.status(503).json({ error: "Ödeme sağlayıcısı yapılandırılmamış" });
       }
-      await pool.query(
-        `UPDATE invoices SET durum = 'Ödendi' WHERE id = $1`,
-        [invoice.id]
-      );
-      await pool.query(
-        `INSERT INTO payments (invoice_id, saglayici, token, durum, tutar)
-         VALUES ($1, 'demo', $2, 'Basarili', $3)`,
-        [invoice.id, "demo-" + invoice.id + "-" + Date.now(), price]
-      );
-      await clearNotificationsForInvoice(invoice.id);
       return res.json({
         demo: true,
-        message: "Demo ödeme tamamlandı (iyzico anahtarı tanımlı değil)",
+        amount: Number(price),
+        fatura_no: invoice.fatura_no,
+        cari_adi: invoice.cari_adi,
       });
     }
 
@@ -677,7 +685,10 @@ router.post("/:id/payment", async (req, res) => {
           `INSERT INTO payments (invoice_id, saglayici, token, durum, tutar) VALUES ($1, 'iyzico', $2, 'Basladi', $3)`,
           [invoice.id, result.token, price]
         );
-        res.json({ paymentPageUrl: result.paymentPageUrl });
+        res.json({
+          paymentPageUrl: result.paymentPageUrl,
+          checkoutFormContent: result.checkoutFormContent,
+        });
       } catch (dbErr) {
         console.error(dbErr);
         res.status(500).json({ error: "ödeme kaydı oluşturulamadı" });

@@ -32,6 +32,11 @@ router.get("/", async (req, res) => {
 
 router.get("/unread-count", async (req, res) => {
   try {
+    try {
+      await sweepOnce(req.businessId);
+    } catch (sweepErr) {
+      console.error("Hatırlatma taraması:", sweepErr);
+    }
     const { rows } = await pool.query(
       `SELECT COUNT(*)::int AS n FROM notifications WHERE business_id = $1 AND durum = 'okunmadi'`,
       [req.businessId]

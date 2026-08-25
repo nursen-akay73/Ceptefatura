@@ -119,6 +119,7 @@
             function setProgress(on) {
                 if (ocrStatus) ocrStatus.style.display = on ? 'block' : 'none';
                 if (ocrProgress) ocrProgress.classList.toggle('is-active', !!on);
+                dropzone?.classList.toggle('is-scanning', !!on);
             }
 
             function clearOcrFields() {
@@ -150,8 +151,8 @@
 
             async function scanFile(file) {
                 if (!file) return;
-                if (!/^image\/(jpeg|png|webp)$/i.test(file.type)) {
-                    showToast('OCR için JPG, PNG veya WEBP yükleyin', 'error');
+                if (!/^(image\/(jpeg|png|webp)|application\/pdf)$/i.test(file.type) && !/\.pdf$/i.test(file.name || '')) {
+                    showToast('OCR için JPG, PNG, WEBP veya PDF yükleyin', 'error');
                     return;
                 }
                 scannedFile = file;

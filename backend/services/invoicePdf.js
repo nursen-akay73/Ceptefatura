@@ -30,6 +30,11 @@ function money(n) {
   );
 }
 
+function upperTr(text) {
+  if (text == null) return "";
+  return String(text).toLocaleUpperCase("tr-TR");
+}
+
 function dateTr(d) {
   if (!d) return "-";
   const dt = new Date(d);
@@ -48,7 +53,7 @@ function timeTr(d) {
 // Bir hücre içeriğini, komşu hücrelere taşmaması için gerekirse sonuna "…"
 // ekleyerek kırpar (doc üzerinde o an ayarlı font/punto ile ölçülür).
 function fitText(doc, text, font, size, maxWidth) {
-  text = String(text ?? "");
+  text = upperTr(text);
   doc.font(font).fontSize(size);
   if (doc.widthOfString(text) <= maxWidth) return text;
   const ell = "…";
@@ -65,13 +70,13 @@ function fitText(doc, text, font, size, maxWidth) {
 function rowText(doc, x, rowTop, text, font, size, opts = {}) {
   const { padTop = 4, width, align } = opts;
   doc.font(font).fontSize(size);
-  doc.text(text, x, rowTop + padTop, { width, align, lineBreak: false });
+  doc.text(upperTr(text), x, rowTop + padTop, { width, align, lineBreak: false });
 }
 
 function sectionHeader(doc, x, yTop, w, title) {
   doc.lineWidth(1.6);
   doc.moveTo(x, yTop).lineTo(x + w, yTop).stroke();
-  doc.font(FONT_BOLD).fontSize(11).text(title, x, yTop + 3, { lineBreak: false });
+  doc.font(FONT_BOLD).fontSize(11).text(upperTr(title), x, yTop + 3, { lineBreak: false });
   doc.moveTo(x, yTop + 18).lineTo(x + w, yTop + 18).stroke();
 }
 
@@ -101,15 +106,15 @@ async function buildInvoicePdf(data) {
   let y = 40;
   sectionHeader(doc, leftX, y, firmaW, "FIRMA");
   y += 32;
-  doc.font(FONT_BOLD).fontSize(10).text(data.firma.isletme_adi || "-", leftX, y, { lineBreak: false });
+  doc.font(FONT_BOLD).fontSize(10).text(upperTr(data.firma.isletme_adi || "-"), leftX, y, { lineBreak: false });
   y += 14;
   doc.font(FONT_REGULAR).fontSize(9);
   const firmaAdres = [data.firma.adres, data.firma.sehir].filter(Boolean).join(", ");
-  doc.text("Adres: " + (firmaAdres || "-"), leftX, y, { lineBreak: false });
+  doc.text(upperTr("Adres: " + (firmaAdres || "-")), leftX, y, { lineBreak: false });
   y += 13;
-  doc.text("VKN: " + (data.firma.vergi_no || "-"), leftX, y, { lineBreak: false });
+  doc.text(upperTr("VKN: " + (data.firma.vergi_no || "-")), leftX, y, { lineBreak: false });
   y += 13;
-  doc.text("Vergi Dairesi: " + (data.firma.vergi_dairesi || "-"), leftX, y, { lineBreak: false });
+  doc.text(upperTr("Vergi Dairesi: " + (data.firma.vergi_dairesi || "-")), leftX, y, { lineBreak: false });
 
   // ---- e-Fatura logosu (T.C. Hazine ve Maliye Bakanlığı - Gelir İdaresi
   // Başkanlığı amblemi; gerçek e-Fatura çıktılarının standart parçasıdır) ----
@@ -117,7 +122,7 @@ async function buildInvoicePdf(data) {
   const logoX = 297 - logoSize / 2;
   const logoYTop = 32;
   doc.image(LOGO_PATH, logoX, logoYTop, { width: logoSize, height: logoSize });
-  doc.font(FONT_BOLD).fontSize(9.5).text("e-Fatura", 167, logoYTop + logoSize + 6, { width: 260, align: "center", lineBreak: false });
+  doc.font(FONT_BOLD).fontSize(9.5).text(upperTr("e-Fatura"), 167, logoYTop + logoSize + 6, { width: 260, align: "center", lineBreak: false });
 
   // ---- QR kod (sag ust) ----
   const qrSize = 95;
@@ -132,7 +137,7 @@ async function buildInvoicePdf(data) {
   const tblY = 135;
   const ozellikRows = [
     ["ÖZELLEŞTİRME NO :", "TR1.2"],
-    ["FATURA TİPİ :", "SATIS"],
+    ["FATURA TİPİ :", "SATIŞ"],
     ["FATURA NO :", data.fatura_no],
     ["FATURA TARİHİ :", dateTr(data.kesim_tarihi)],
     ["FATURA ZAMANI :", timeTr(data.created_at)],
@@ -154,22 +159,22 @@ async function buildInvoicePdf(data) {
   const cariW = 260;
   sectionHeader(doc, leftX, cariTop, cariW, "EFATURA CARİ");
   y = cariTop + 32;
-  doc.font(FONT_BOLD).fontSize(10).text(data.cari.cari_adi || "-", leftX, y, { lineBreak: false });
+  doc.font(FONT_BOLD).fontSize(10).text(upperTr(data.cari.cari_adi || "-"), leftX, y, { lineBreak: false });
   y += 14;
   doc.font(FONT_REGULAR).fontSize(9);
-  doc.text("Adres: " + (data.cari.adres || "-"), leftX, y, { lineBreak: false });
+  doc.text(upperTr("Adres: " + (data.cari.adres || "-")), leftX, y, { lineBreak: false });
   y += 13;
-  doc.text("VKN: " + (data.cari.vergi_no || "-"), leftX, y, { lineBreak: false });
+  doc.text(upperTr("VKN: " + (data.cari.vergi_no || "-")), leftX, y, { lineBreak: false });
   y += 13;
-  doc.text("Vergi Dairesi: " + (data.cari.vergi_dairesi || "-"), leftX, y, { lineBreak: false });
+  doc.text(upperTr("Vergi Dairesi: " + (data.cari.vergi_dairesi || "-")), leftX, y, { lineBreak: false });
   y += 20;
-  doc.text("Teslimat Adresi: " + (data.cari.adres || "-"), leftX, y, { lineBreak: false });
+  doc.text(upperTr("Teslimat Adresi: " + (data.cari.adres || "-")), leftX, y, { lineBreak: false });
   y += 13;
   const cariBottom = y + 8;
 
   // ---- ETTN (CARI blogu ve ozellik tablosunun ALTINDA, cakismasin diye dinamik) ----
   const ettnY = Math.max(cariBottom, ozellikBottom) + 14;
-  doc.font(FONT_BOLD).fontSize(8.5).text("ETTN: " + data.ettn, leftX, ettnY, { lineBreak: false });
+  doc.font(FONT_BOLD).fontSize(8.5).text(upperTr("ETTN: " + data.ettn), leftX, ettnY, { lineBreak: false });
 
   // ---- kalem tablosu ----
   const tableTop = ettnY + 18;

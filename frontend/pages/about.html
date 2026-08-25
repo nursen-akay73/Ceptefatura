@@ -1,0 +1,85 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Hakkımızda | CepteFatura</title>
+    <script src="../assets/js/dark-mode.js"></script>
+    <link rel="stylesheet" href="../assets/css/style.css">
+    <link rel="icon" href="../assets/img/logo-icon.png">
+</head>
+<body class="about-page" data-page="about">
+    <div class="about-decor" aria-hidden="true">
+        <span class="about-shape rect r1"></span>
+        <span class="about-shape rect r2"></span>
+        <span class="about-shape rect r3"></span>
+        <span class="about-shape oval o1"></span>
+        <span class="about-shape oval o2"></span>
+        <span class="about-shape oval o3"></span>
+        <span class="about-shape line l1"></span>
+        <span class="about-shape line l2"></span>
+    </div>
+    <div class="about-wrap">
+        <header class="about-top">
+            <a class="about-logo" href="login.html" aria-label="CepteFatura">
+                <img src="../assets/img/logo.png" alt="CepteFatura">
+            </a>
+            <nav class="about-top-nav">
+                <a href="login.html" data-about-guest>Giriş Yap</a>
+                <a class="btn btn-primary" href="register.html" data-open-app>Kayıt Ol</a>
+            </nav>
+        </header>
+
+        <article class="about-card">
+            <p class="about-kicker">CepteFatura</p>
+            <h1>Hakkımızda</h1>
+            <p class="about-sub">KOBİ ve esnaf için sade, anlaşılır muhasebe</p>
+            <p class="about-lead">Fatura, gider ve cari hesapları tek panelde tutuyoruz. Mali müşaviriniz de aynı panele bağlanır; evrak peşinde koşmak azalır.</p>
+
+            <div class="about-grid">
+                <section>
+                    <h2>Ne sunuyoruz</h2>
+                    <ul>
+                        <li>Giden ve gelen fatura takibi</li>
+                        <li>GİB formatında fatura numarası ve e-fatura görünümlü PDF</li>
+                        <li>Fiş ve fatura görüntüsünden otomatik doldurma (OCR)</li>
+                        <li>Cari hesap, gider ve KDV özeti</li>
+                        <li>Vade bildirimleri ve Cepte Asistan</li>
+                    </ul>
+                </section>
+                <section>
+                    <h2>Kimler için</h2>
+                    <ul>
+                        <li>Hızlı fatura kesmek isteyen esnaf ve KOBİ’ler</li>
+                        <li>Müşterilerini tek yerden izlemek isteyen mali müşavirler</li>
+                        <li>Kartvizit kadar sade bir arayüz arayan işletmeler</li>
+                    </ul>
+                </section>
+                <section>
+                    <h2>Nasıl başlanır</h2>
+                    <ul>
+                        <li>Ücretsiz katmanda aylık 10 faturaya kadar deneyin</li>
+                        <li>Kayıt 2 dakikadan kısa sürer</li>
+                        <li>Kart bilgisi istemeyiz; dilediğinizde paketi yükseltirsiniz</li>
+                    </ul>
+                </section>
+            </div>
+
+            <p class="about-note">Canlı GİB gönderimi ve gerçek tahsilat bağlantısı ürün yol haritasındadır. Bugün panelde kesim, arşiv, OCR ve muhasebeci iş birliği çalışır.</p>
+        </article>
+        <footer class="about-foot">CepteFatura — fatura, gider ve cari tek panelde.</footer>
+    </div>
+    <script src="../assets/js/script.js"></script>
+    <script>
+        try {
+            if (localStorage.getItem("token")) {
+                document.querySelectorAll("[data-about-guest]").forEach((el) => { el.hidden = true; });
+                document.querySelectorAll("[data-open-app]").forEach((el) => {
+                    el.href = "dashboard.html";
+                    el.textContent = "Panele dön";
+                });
+            }
+        } catch {}
+    </script>
+</body>
+</html>

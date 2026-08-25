@@ -100,7 +100,7 @@ function classifyIntent(rawMessage) {
     }
   }
 
-  if (/kac\s+fatura/.test(text) || (/fatura/.test(text) && /kestim/.test(text))) {
+  if (/kac\s+(tane\s+)?fatura/.test(text) || /fatura\s+sayisi/.test(text)) {
     return { type: "count_invoices_this_month" };
   }
   if (/ciro/.test(text)) {

@@ -25,6 +25,8 @@ const STATEMENTS = [
      created_at  timestamptz NOT NULL DEFAULT now(),
      UNIQUE (invoice_id, tur)
    )`,
+  `CREATE UNIQUE INDEX IF NOT EXISTS notifications_invoice_id_tur_key
+     ON notifications (invoice_id, tur)`,
   `CREATE TABLE IF NOT EXISTS invoice_no_counters (
      business_id uuid NOT NULL REFERENCES businesses(id) ON DELETE CASCADE,
      yil         integer NOT NULL,

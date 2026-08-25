@@ -26,31 +26,34 @@
                 </div>
             </div>
 
-            <div class="card" id="scan-card" style="margin-bottom:16px;">
-                <div style="display:flex; justify-content:space-between; align-items:center; gap:12px; flex-wrap:wrap;">
+            <div class="card scan-card" id="scan-card">
+                <span class="scan-ring" aria-hidden="true"></span>
+                <div class="scan-card-inner">
                     <div>
-                        <h3 style="font-size:15px; margin:0 0 4px 0;">Görüntüden Otomatik Doldur</h3>
-                        <p style="margin:0; font-size:13px; color:var(--muted);">Fatura/fiş fotoğrafı yükleyin; alanlar forma dolar, kaydetmeden önce kontrol edin.</p>
+                        <h3 class="scan-card-title">Görüntüden Otomatik Doldur</h3>
+                        <p class="scan-card-copy">Fatura fotoğrafı veya PDF yükleyin; fatura no, tarih, cari ve kalemler forma dolar. Kaydetmeden önce kontrol edin.</p>
                     </div>
-                    <div style="display:flex; gap:10px;">
+                    <div class="scan-card-actions">
                         <button type="button" class="btn btn-secondary" id="btn-scan-camera">Kamerayı Aç</button>
                         <button type="button" class="btn btn-secondary" id="btn-scan-upload">Dosya Yükle</button>
                     </div>
                 </div>
-                <input type="file" id="scan-camera-input" accept="image/*" capture="environment" style="display:none;">
-                <input type="file" id="scan-file-input" accept="image/jpeg,image/png,image/webp" style="display:none;">
-                <div id="scan-status" style="display:none; margin-top:10px; font-size:13px; color:var(--muted);">Görüntü taranıyor, lütfen bekleyin...</div>
+                <input type="file" id="scan-camera-input" accept="image/*" capture="environment" hidden>
+                <input type="file" id="scan-file-input" accept="image/jpeg,image/png,image/webp,application/pdf,.pdf" hidden>
+                <p class="scan-status" id="scan-status" hidden>Görüntü taranıyor, lütfen bekleyin...</p>
             </div>
 
             <form class="card form-card" id="form-new-invoice">
                 <div class="form-grid">
                     <div class="form-group">
                         <label>Fatura No</label>
-                        <input type="text" value="Kaydedince otomatik atanır" readonly style="background:#f8fafc;">
+                        <input type="text" id="fatura-no-display" value="Kaydedince otomatik atanır" readonly>
+                        <small id="fatura-no-hint" class="field-hint">Kayıtta GİB formatında otomatik atanır. Belgedeki numara okunursa burada görünür.</small>
                     </div>
                     <div class="form-group">
                         <label>Cari / Müşteri</label>
                         <select id="select-cari"></select>
+                        <small id="ocr-cari-hint" class="field-hint" hidden></small>
                     </div>
                     <div class="form-group" id="branch-field" hidden>
                         <label>Şube</label>
@@ -111,11 +114,11 @@
                             <tr>
                                 <td>
                                     <div class="input-mic">
-                                        <input class="table-input item-desc" placeholder="Konuşun, faturaya yazılsın..." value="Danışmanlık Hizmet Bedeli">
+                                        <input class="table-input item-desc" placeholder="Konuşun, faturaya yazılsın..." value="">
                                         <button type="button" class="mic-btn" title="Sesle yaz">🎤</button>
                                     </div>
                                 </td>
-                                <td><input class="table-input item-qty" type="number" value="0" min="1"></td>
+                                <td><input class="table-input item-qty" type="number" value="1" min="1"></td>
                                 <td><input class="table-input item-price" type="number" value="0"></td>
                                 <td><input class="table-input item-iskonto" type="number" value="0" min="0" max="100"></td>
                                 <td>
@@ -126,7 +129,7 @@
                                         <option value="0">%0</option>
                                     </select>
                                 </td>
-                                <td class="item-total money" style="font-weight:600;">₺8.750,00</td>
+                                <td class="item-total money" style="font-weight:600;">₺0,00</td>
                                 <td><button type="button" class="text-btn btn-delete-row" style="color:var(--danger);">Sil</button></td>
                             </tr>
                         </tbody>
@@ -134,10 +137,10 @@
                 </div>
 
                 <div class="totals-card" id="invoice-totals">
-                    <div><span>Ara toplam</span><span id="sum-sub">₺8.750,00</span></div>
+                    <div><span>Ara toplam</span><span id="sum-sub">₺0,00</span></div>
                     <div><span>İskonto</span><span id="sum-iskonto">₺0,00</span></div>
-                    <div><span>KDV</span><span id="sum-vat">₺1.750,00</span></div>
-                    <div class="grand"><span>Genel toplam</span><span id="sum-grand">₺10.500,00</span></div>
+                    <div><span>KDV</span><span id="sum-vat">₺0,00</span></div>
+                    <div class="grand"><span>Genel toplam</span><span id="sum-grand">₺0,00</span></div>
                 </div>
 
                 <div class="form-actions" style="margin-top:24px; display:flex; justify-content:flex-end; gap:10px;">
@@ -162,13 +165,17 @@
             const vadeInput = document.getElementById('vade-tarihi');
 
             const today = new Date();
-            const inMonth = new Date(today.getFullYear(), today.getMonth() + 1, today.getDate());
-            kesimInput.value = today.toISOString().slice(0, 10);
-            vadeInput.value = inMonth.toISOString().slice(0, 10);
+            const inThreeDays = new Date(today.getFullYear(), today.getMonth(), today.getDate() + 3);
+            function ymdLocal(d) {
+                const p = (n) => String(n).padStart(2, "0");
+                return d.getFullYear() + "-" + p(d.getMonth() + 1) + "-" + p(d.getDate());
+            }
+            kesimInput.value = ymdLocal(today);
+            vadeInput.value = ymdLocal(inThreeDays);
 
             try {
                 const cariler = await apiFetch('/api/accounts');
-                selectCari.innerHTML = cariler
+                selectCari.innerHTML = '<option value="">Cari seçin</option>' + cariler
                     .map((c) => `<option value="${c.id}">${escapeHtml(c.cari_adi)}</option>`)
                     .join('');
                 if (selectedCariFromUrl) {
@@ -274,12 +281,28 @@
             }
 
             function fillFormFromScan(data) {
+                const noInput = document.getElementById('fatura-no-display');
+                const noHint = document.getElementById('fatura-no-hint');
+                const cariHint = document.getElementById('ocr-cari-hint');
+                if (cariHint) {
+                    cariHint.hidden = true;
+                    cariHint.textContent = '';
+                }
+
+                if (data.fatura_no && noInput) {
+                    noInput.value = data.fatura_no;
+                    if (noHint) {
+                        noHint.textContent = 'Belgeden okundu. Kaydederken yine kendi GİB fatura numaranız atanır.';
+                    }
+                }
+
                 if (data.cari_adi) {
                     const target = String(data.cari_adi).toLowerCase().trim();
                     const noise = /^(bilgileri?|bilgi|ad[ıi]|unvan[ıi]|fatura|müşteri|alıcı)$/i.test(target);
                     let matched = false;
                     if (!noise && target.length >= 3) {
                         for (let i = 0; i < selectCari.options.length; i++) {
+                            if (!selectCari.options[i].value) continue;
                             const optText = selectCari.options[i].text.toLowerCase();
                             if (
                                 optText === target ||
@@ -291,35 +314,63 @@
                             }
                         }
                         if (!matched) {
-                            // Kırmızı hata değil: OCR isim buldu ama cari hesaplarda yok
+                            selectCari.value = '';
+                            if (cariHint) {
+                                cariHint.hidden = false;
+                                cariHint.textContent = 'Belgeden okunan cari: "' + data.cari_adi + '". Listede yok — seçin veya Cari Hesaplar’dan ekleyin.';
+                            }
                             showToast(
                               'OCR cari: "' + data.cari_adi + '". Listede yoksa Cari / Müşteri’den seçin veya yeni cari ekleyin.'
                             );
                         }
                     }
                 }
-                if (data.tarih) kesimInput.value = data.tarih;
-                if (data.vade_tarihi) vadeInput.value = data.vade_tarihi;
+                if (data.tarih) {
+                    const todayYmd = ymdLocal(new Date());
+                    if (data.tarih >= todayYmd) kesimInput.value = data.tarih;
+                }
+                if (data.vade_tarihi) {
+                    const todayYmd = ymdLocal(new Date());
+                    if (data.vade_tarihi >= todayYmd) vadeInput.value = data.vade_tarihi;
+                }
                 if (data.fatura_notu && !/fatura\s*tarih|senaryo|fatura\s*tip|bilgi/i.test(data.fatura_notu)) {
                     const note = document.getElementById('fatura_notu');
-                    if (note) note.value = data.fatura_notu;
+                    if (note && !note.value) note.value = data.fatura_notu;
                 }
-                if (Array.isArray(data.kalemler) && data.kalemler.length > 0) {
-                    itemsBody.innerHTML = '';
-                    data.kalemler.forEach((item) => {
-                        const tr = document.createElement('tr');
-                        tr.innerHTML = itemRowHtml(item);
-                        itemsBody.appendChild(tr);
-                    });
-                    calculateTotals();
-                }
+                itemsBody.innerHTML = '';
+                const kalemler = Array.isArray(data.kalemler) && data.kalemler.length > 0
+                    ? data.kalemler
+                    : [{}];
+                kalemler.forEach((item) => {
+                    const tr = document.createElement('tr');
+                    tr.innerHTML = itemRowHtml(item);
+                    itemsBody.appendChild(tr);
+                });
+                calculateTotals();
                 showToast('Görüntüden bilgiler dolduruldu, kontrol edip kaydedin.');
             }
 
             async function handleScanFile(file) {
                 if (!file) return;
+                const okType = /^(image\/(jpeg|png|webp)|application\/pdf)$/i.test(file.type)
+                    || /\.pdf$/i.test(file.name || '');
+                if (!okType) {
+                    showToast('JPG, PNG, WEBP veya PDF yükleyin', 'error');
+                    return;
+                }
+                const scanCard = document.getElementById('scan-card');
+                if (scanCard?.classList.contains('is-scanning')) return;
                 const scanStatus = document.getElementById('scan-status');
-                scanStatus.style.display = 'block';
+                const camBtn = document.getElementById('btn-scan-camera');
+                const upBtn = document.getElementById('btn-scan-upload');
+                const isPdf = file.type === 'application/pdf' || /\.pdf$/i.test(file.name || '');
+                scanStatus.textContent = isPdf
+                    ? 'PDF okunuyor… belgedeki alanlar doldurulacak'
+                    : 'Görüntü taranıyor… belgedeki alanlar doldurulacak';
+                scanStatus.hidden = false;
+                scanCard?.classList.add('is-scanning');
+                if (camBtn) camBtn.disabled = true;
+                if (upBtn) upBtn.disabled = true;
                 try {
                     const formData = new FormData();
                     formData.append('belge', file);
@@ -328,7 +379,10 @@
                 } catch (err) {
                     showToast(err.message || 'Görüntü okunamadı', 'error');
                 } finally {
-                    scanStatus.style.display = 'none';
+                    scanStatus.hidden = true;
+                    scanCard?.classList.remove('is-scanning');
+                    if (camBtn) camBtn.disabled = false;
+                    if (upBtn) upBtn.disabled = false;
                 }
             }
 

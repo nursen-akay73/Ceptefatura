@@ -198,10 +198,13 @@
                     </div>
                 </div>
             </div>
-            <div style="display:flex; justify-content:flex-end; gap:10px; margin-top:20px; border-top:1px solid #f1f5f9; padding-top:12px;">
-                <button class="btn btn-secondary" id="closeModalBtn">Kapat</button>
-                <button class="btn btn-primary" type="button" id="btn-pay-invoice" hidden>Ödeme Al →</button>
-                <button class="btn btn-primary" type="button" id="btn-pdf-invoice">PDF İndir</button>
+            <div style="display:flex; justify-content:space-between; align-items:center; gap:10px; margin-top:20px; border-top:1px solid #f1f5f9; padding-top:12px;">
+                <button class="btn btn-danger" type="button" id="btn-delete-invoice">Sil</button>
+                <div style="display:flex; gap:10px;">
+                    <button class="btn btn-secondary" id="closeModalBtn">Kapat</button>
+                    <button class="btn btn-primary" type="button" id="btn-pay-invoice" hidden>Ödeme Al →</button>
+                    <button class="btn btn-primary" type="button" id="btn-pdf-invoice">PDF İndir</button>
+                </div>
             </div>
         </div>
     </div>
@@ -266,7 +269,8 @@
 
             async function loadInvoices() {
                 const params = new URLSearchParams();
-                if (searchInput.value.trim()) params.set('search', searchInput.value.trim());
+                const q = searchInput.value.trim();
+                if (q) params.set('search', q);
                 if (statusSelect.value !== 'Tüm Durumlar') params.set('status', statusSelect.value);
                 if (typeSelect.value !== 'Tüm Türler') params.set('type', typeSelect.value);
                 if (branchSelect.value) params.set('branch_id', branchSelect.value);
@@ -276,13 +280,38 @@
                     tableBody.innerHTML = '';
                     list.forEach((inv) => tableBody.appendChild(renderRow(inv)));
                     syncEmptyStates();
+                    maybeOpenFromSearch(list);
                 } catch (err) {
                     showToast(err.message || 'Faturalar alınamadı', 'error');
                 }
             }
 
+            let lastAutoOpenedId = '';
+            function maybeOpenFromSearch(list) {
+                const q = searchInput.value.trim().toUpperCase().replace(/\s+/g, '');
+                if (q.length < 8) return;
+                const looksLikeNo = /^[A-Z]{3}\d{4,}$/.test(q) || q.length >= 12;
+                if (!looksLikeNo) return;
+                const exact = list.filter((inv) => String(inv.fatura_no || '').toUpperCase() === q);
+                const unique = exact.length === 1 ? exact[0] : (list.length === 1 ? list[0] : null);
+                if (!unique) return;
+                if (lastAutoOpenedId === unique.id && modal.classList.contains('active')) return;
+                lastAutoOpenedId = unique.id;
+                openDetail(unique.id);
+            }
+
             let debounce;
-            searchInput.addEventListener('input', () => { clearTimeout(debounce); debounce = setTimeout(loadInvoices, 300); });
+            searchInput.addEventListener('input', () => {
+                clearTimeout(debounce);
+                debounce = setTimeout(loadInvoices, 280);
+            });
+            searchInput.addEventListener('keydown', (e) => {
+                if (e.key === 'Enter') {
+                    e.preventDefault();
+                    clearTimeout(debounce);
+                    loadInvoices();
+                }
+            });
             statusSelect.addEventListener('change', loadInvoices);
             typeSelect.addEventListener('change', loadInvoices);
             branchSelect.addEventListener('change', loadInvoices);
@@ -292,6 +321,7 @@
             const closeModalBtn = document.getElementById('closeModalBtn');
             const payBtn = document.getElementById('btn-pay-invoice');
             const pdfBtn = document.getElementById('btn-pdf-invoice');
+            const deleteBtn = document.getElementById('btn-delete-invoice');
             let currentInvoiceId = null;
 
             pdfBtn?.addEventListener('click', async function () {
@@ -354,26 +384,37 @@
                 if (e.target === modal) hideModal();
             });
 
+            deleteBtn?.addEventListener('click', async function () {
+                if (!currentInvoiceId) return;
+                if (!confirm('Bu faturayı silmek istediğinize emin misiniz? Bu işlem geri alınamaz.')) return;
+                deleteBtn.disabled = true;
+                try {
+                    await apiFetch('/api/invoices/' + currentInvoiceId, { method: 'DELETE' });
+                    showToast('Fatura silindi');
+                    hideModal();
+                    loadInvoices();
+                    if (typeof loadNotifUnreadCount === 'function') loadNotifUnreadCount();
+                } catch (err) {
+                    showToast(err.message || 'Fatura silinemedi', 'error');
+                } finally {
+                    deleteBtn.disabled = false;
+                }
+            });
+
             payBtn.addEventListener('click', async function () {
                 if (!currentInvoiceId) return;
                 payBtn.disabled = true;
                 try {
                     const result = await apiFetch('/api/invoices/' + currentInvoiceId + '/payment', { method: 'POST' });
-                    if (result.paymentPageUrl) {
-                        window.location.href = result.paymentPageUrl;
-                        return;
-                    }
-                    if (result.demo) {
-                        showToast('Demo tahsilat alındı — fatura Ödendi');
-                        hideModal();
-                        loadInvoices();
-                        payBtn.disabled = false;
-                        return;
-                    }
-                    showToast('Ödeme yanıtı alınamadı', 'error');
-                    payBtn.disabled = false;
+                    openIyzicoPayPanel({
+                        ...result,
+                        fatura_no: document.getElementById('m-fatura-no').innerText,
+                        cari_adi: document.getElementById('m-cari').innerText,
+                        amountLabel: document.getElementById('m-toplam').innerText,
+                    });
                 } catch (err) {
                     showToast(err.message || 'Ödeme başlatılamadı', 'error');
+                } finally {
                     payBtn.disabled = false;
                 }
             });

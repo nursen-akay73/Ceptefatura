@@ -114,7 +114,7 @@
                 </div>
                 <div style="display:flex; gap:10px;">
                     <a href="dashboard.html" class="btn btn-secondary"> Ana Sayfa</a>
-                    <button class="btn btn-primary" id="btn-open-new"> Yeni Cari</button>
+                    <button class="btn btn-primary" type="button" id="btn-open-new">+ Yeni Cari</button>
                 </div>
             </div>
 
@@ -151,7 +151,6 @@
                     <div class="empty-icon">♙</div>
                     <p data-empty-none>Henüz cari hesap eklemediniz. İlk müşteri veya tedarikçinizi kaydedin.</p>
                     <p data-empty-filter hidden>Aramanıza uygun cari bulunamadı.</p>
-                    <button class="btn btn-primary" type="button" id="btn-empty-new-account">+ Yeni Cari</button>
                 </div>
             </div>
 
@@ -177,9 +176,12 @@
                     <div style="grid-column: 1 / -1;"><strong>Adres:</strong> <br><span id="m-account-adres">—</span></div>
                 </div>
             </div>
-            <div style="display:flex; justify-content:flex-end; gap:10px; margin-top:20px; border-top:1px solid #f1f5f9; padding-top:12px;">
-                <button class="btn btn-secondary" id="closeDetailBtn">Kapat</button>
-                <a class="btn btn-primary" id="btn-invoice-for-account" href="invoice-new.html"> Bu Cariye Fatura Kes</a>
+            <div style="display:flex; justify-content:space-between; align-items:center; gap:10px; margin-top:20px; border-top:1px solid #f1f5f9; padding-top:12px;">
+                <button class="btn btn-danger" type="button" id="btn-delete-account">Sil</button>
+                <div style="display:flex; gap:10px;">
+                    <button class="btn btn-secondary" id="closeDetailBtn">Kapat</button>
+                    <a class="btn btn-primary" id="btn-invoice-for-account" href="invoice-new.html"> Bu Cariye Fatura Kes</a>
+                </div>
             </div>
         </div>
     </div>
@@ -315,8 +317,11 @@
             const detailModal = document.getElementById('accountDetailModal');
             const closeDetailModal = document.getElementById('closeDetailModal');
             const closeDetailBtn = document.getElementById('closeDetailBtn');
+            const deleteAccountBtn = document.getElementById('btn-delete-account');
+            let currentAccountId = null;
 
             function openDetail(acc, turLabel, durum) {
+                currentAccountId = acc.id;
                 document.getElementById('m-account-name').innerText = acc.cari_adi;
                 document.getElementById('m-account-role').innerText = turLabel;
                 document.getElementById('m-account-vno').innerText = acc.vergi_no || '—';
@@ -335,9 +340,28 @@
                 detailModal.classList.add('active');
             }
 
-            function hideDetailModal() { detailModal.classList.remove('active'); }
+            function hideDetailModal() {
+                detailModal.classList.remove('active');
+                currentAccountId = null;
+            }
             if (closeDetailModal) closeDetailModal.addEventListener('click', hideDetailModal);
             if (closeDetailBtn) closeDetailBtn.addEventListener('click', hideDetailModal);
+
+            deleteAccountBtn?.addEventListener('click', async function () {
+                if (!currentAccountId) return;
+                if (!confirm('Bu cari hesabı silmek istediğinize emin misiniz? Bu işlem geri alınamaz.')) return;
+                deleteAccountBtn.disabled = true;
+                try {
+                    await apiFetch('/api/accounts/' + currentAccountId, { method: 'DELETE' });
+                    showToast('Cari silindi');
+                    hideDetailModal();
+                    loadAccounts();
+                } catch (err) {
+                    showToast(err.message || 'Cari silinemedi', 'error');
+                } finally {
+                    deleteAccountBtn.disabled = false;
+                }
+            });
 
             const newModal = document.getElementById('newAccountModal');
             const btnOpenNew = document.getElementById('btn-open-new');

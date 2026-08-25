@@ -31,7 +31,8 @@
         </aside>
         <div class="auth-box">
             <div class="auth-brand">
-                <img class="brand-logo" src="../assets/img/logo.png" alt="CepteFatura">
+                <img class="brand-logo brand-logo-light" src="../assets/img/logo.png" alt="CepteFatura">
+                <img class="brand-logo brand-logo-dark" src="../assets/img/logo-dark.png" alt="CepteFatura">
                 <p>Hesabınıza giriş yapın</p>
             </div>
             <form data-auth-form="login">
@@ -55,7 +56,11 @@
                 </div>
                 <button class="btn btn-primary" type="submit">Giriş Yap</button>
             </form>
-            <div class="auth-footer">Hesabınız yok mu? <a href="register.html">Ücretsiz Kayıt Ol</a></div>
+            <div class="auth-footer">
+                Hesabınız yok mu? <a href="register.html" data-open-app>Kayıt Ol</a>
+                <span class="auth-footer-sep" aria-hidden="true">·</span>
+                <a href="about.html">Hakkımızda</a>
+            </div>
         </div>
     </div>
     <script src="../assets/js/script.js"></script>

@@ -6,19 +6,33 @@
 
 const { pool } = require("../db");
 
-const YAKLASAN_GUN = 3; // vade_tarihi bugünden itibaren şu kadar gün içindeyse "yaklaşıyor" say
+const YAKLASAN_GUN = 7; // vade bugünden itibaren bu kadar gün içindeyse bildirim üret
+const TZ = "Europe/Istanbul";
 
 function money(n) {
   return Number(n || 0).toLocaleString("tr-TR", { minimumFractionDigits: 2 });
 }
 
-// Vadesi bugünden önce olup hâlâ 'Bekliyor' görünen faturaları 'Gecikti' olarak
-// işaretler. Daha önce hiçbir yerde bu geçişi otomatik yapan kod yoktu; durum
-// alanı elle değiştirilmediği sürece hep 'Bekliyor' kalıyordu.
+function vadeYmd(d) {
+  if (!d) return "-";
+  if (typeof d === "string") return d.slice(0, 10);
+  try {
+    return new Date(d).toLocaleDateString("en-CA", { timeZone: TZ });
+  } catch {
+    return String(d).slice(0, 10);
+  }
+}
+
+function todayIstanbulSql() {
+  return `(timezone('${TZ}', now()))::date`;
+}
+
 async function markOverdueInvoices(client) {
   await client.query(
     `UPDATE invoices SET durum = 'Gecikti'
-     WHERE durum = 'Bekliyor' AND vade_tarihi IS NOT NULL AND vade_tarihi < CURRENT_DATE`
+     WHERE durum = 'Bekliyor'
+       AND vade_tarihi IS NOT NULL
+       AND (vade_tarihi)::date < ${todayIstanbulSql()}`
   );
 }
 
@@ -58,7 +72,7 @@ async function sweepOnce(businessId = null) {
     await client.query("BEGIN");
     await markOverdueInvoices(client);
 
-    const values = [];
+    const values = [YAKLASAN_GUN];
     let businessFilter = "";
     if (businessId) {
       values.push(businessId);
@@ -68,20 +82,21 @@ async function sweepOnce(businessId = null) {
     const { rows: candidates } = await client.query(
       `SELECT i.id, i.business_id, i.fatura_no, i.tutar, i.vade_tarihi, i.durum, a.cari_adi
        FROM invoices i
-       JOIN accounts a ON a.id = i.account_id
+       LEFT JOIN accounts a ON a.id = i.account_id
        WHERE i.durum IN ('Bekliyor', 'Gecikti')
          AND i.vade_tarihi IS NOT NULL
-         AND i.vade_tarihi <= CURRENT_DATE + INTERVAL '${YAKLASAN_GUN} days'
+         AND (i.vade_tarihi)::date <= ${todayIstanbulSql()} + $1::int
          ${businessFilter}`,
       values
     );
 
     for (const inv of candidates) {
       const tur = inv.durum === "Gecikti" ? "vade_gecti" : "vade_yaklasiyor";
+      const cari = inv.cari_adi || "Cari";
       const mesaj =
         tur === "vade_gecti"
-          ? `${inv.fatura_no} numaralı fatura (${inv.cari_adi}, ₺${money(inv.tutar)}) vadesi geçti.`
-          : `${inv.fatura_no} numaralı fatura (${inv.cari_adi}, ₺${money(inv.tutar)}) vadesi ${inv.vade_tarihi.toISOString().slice(0, 10)} tarihinde doluyor.`;
+          ? `${inv.fatura_no} numaralı fatura (${cari}, ₺${money(inv.tutar)}) vadesi geçti.`
+          : `${inv.fatura_no} numaralı fatura (${cari}, ₺${money(inv.tutar)}) vadesi ${vadeYmd(inv.vade_tarihi)} tarihinde doluyor.`;
 
       const { rowCount } = await client.query(
         `INSERT INTO notifications (business_id, invoice_id, tur, mesaj)

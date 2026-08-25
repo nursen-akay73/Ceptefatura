@@ -334,21 +334,15 @@
                 payBtn.disabled = true;
                 try {
                     const result = await apiFetch('/api/invoices/' + currentInvoiceId + '/payment', { method: 'POST' });
-                    if (result.paymentPageUrl) {
-                        window.location.href = result.paymentPageUrl;
-                        return;
-                    }
-                    if (result.demo) {
-                        showToast('Demo ödeme alındı — fatura Ödendi');
-                        hideModal();
-                        loadInvoices();
-                        payBtn.disabled = false;
-                        return;
-                    }
-                    showToast('Ödeme yanıtı alınamadı', 'error');
-                    payBtn.disabled = false;
+                    openIyzicoPayPanel({
+                        ...result,
+                        fatura_no: document.getElementById('m-fatura-no').innerText,
+                        cari_adi: document.getElementById('m-cari').innerText,
+                        amountLabel: document.getElementById('m-toplam').innerText,
+                    });
                 } catch (err) {
                     showToast(err.message || 'Ödeme başlatılamadı', 'error');
+                } finally {
                     payBtn.disabled = false;
                 }
             });

@@ -40,6 +40,8 @@ build/Release
 # Dependency directories
 node_modules/
 node_modules.nosync/
+node_modules.icloud-bak*/
+node_modules.icloud-stub/
 jspm_packages/
 
 # Snowpack dependency directory (https://snowpack.dev/)

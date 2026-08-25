@@ -12,25 +12,99 @@ try {
 }
 
 const ALLOWED_OCR_TYPES = new Set(["image/jpeg", "image/png", "image/webp"]);
+const PDF_TYPE = "application/pdf";
+
+async function extractPdfText(buffer) {
+  let pdfjs;
+  try {
+    pdfjs = require("pdfjs-dist/legacy/build/pdf.js");
+  } catch {
+    const err = new Error("PDF okuma paketi yüklü değil. JPG/PNG deneyin veya sunucuyu güncelleyin.");
+    err.status = 500;
+    throw err;
+  }
+  try {
+    const data = new Uint8Array(buffer);
+    const loadingTask = pdfjs.getDocument({
+      data,
+      disableWorker: true,
+      isEvalSupported: false,
+      useSystemFonts: true,
+    });
+    const pdf = await loadingTask.promise;
+    const maxPages = Math.min(pdf.numPages, 4);
+    const parts = [];
+    for (let i = 1; i <= maxPages; i++) {
+      const page = await pdf.getPage(i);
+      const content = await page.getTextContent();
+      const items = content.items || [];
+      let lastY = null;
+      let buf = [];
+      const lines = [];
+      for (const it of items) {
+        const str = it && it.str ? String(it.str) : "";
+        if (!str) continue;
+        const y = it.transform ? Math.round(it.transform[5]) : lastY;
+        const newLine =
+          (lastY != null && y != null && Math.abs(y - lastY) > 3) ||
+          (buf.length > 0 && /^(Invoice\s*(Number|Date|No)|Due\s*Date|Bill\s*To|Ship\s*To|Total|Fatura\s*(No|Tarihi)|Vade|Sayın)/i.test(str.trim()));
+        if (newLine) {
+          if (buf.length) lines.push(buf.join(" ").replace(/\s+/g, " ").trim());
+          buf = [];
+        }
+        buf.push(str);
+        lastY = y;
+        if (it.hasEOL) {
+          lines.push(buf.join(" ").replace(/\s+/g, " ").trim());
+          buf = [];
+        }
+      }
+      if (buf.length) lines.push(buf.join(" ").replace(/\s+/g, " ").trim());
+      parts.push(lines.filter(Boolean).join("\n"));
+    }
+    return parts.join("\n");
+  } catch (e) {
+    const err = new Error("PDF okunamadı. Taranmış PDF ise sayfayı JPG olarak kaydedip yükleyin.");
+    err.status = 422;
+    throw err;
+  }
+}
 
 async function preprocessImage(buffer) {
   if (!sharp) return buffer;
   try {
     return await sharp(buffer)
       .rotate()
-      .resize({ width: 2200, withoutEnlargement: false })
+      .resize({ width: 1400, height: 1400, fit: "inside", withoutEnlargement: true })
       .grayscale()
-      .normalize()
-      .sharpen()
+      .jpeg({ quality: 82, mozjpeg: true })
       .toBuffer();
   } catch {
     return buffer;
   }
 }
 
+let ocrWorkerPromise = null;
+let ocrQueue = Promise.resolve();
+
+async function getOcrWorker() {
+  if (!ocrWorkerPromise) {
+    ocrWorkerPromise = Tesseract.createWorker("tur+eng", 1, { logger: () => {} }).then(async (worker) => {
+      await worker.setParameters({ tessedit_pageseg_mode: "6" });
+      return worker;
+    });
+  }
+  return ocrWorkerPromise;
+}
+
 async function runOcr(buffer) {
-  const { data } = await Tesseract.recognize(buffer, "eng+tur");
-  return data.text || "";
+  const job = ocrQueue.then(async () => {
+    const worker = await getOcrWorker();
+    const { data } = await worker.recognize(buffer);
+    return data.text || "";
+  });
+  ocrQueue = job.catch(() => {});
+  return job;
 }
 
 function normalizeNumber(raw) {
@@ -99,6 +173,7 @@ function cleanPersonOrCompanyName(value) {
   if (!value) return null;
   let cleaned = String(value)
     .replace(/^(unvan[ıi]|ad[ıi]\s*soyad[ıi]|ad[ıi]|firma\s*ad[ıi])\s*[:.]?\s*/i, "")
+    .replace(/\s+(?:total|subtotal|amount\s*due|balance\s*due|due\s*date|invoice\s*date|genel\s*toplam|vade|tarih)\b.*$/i, "")
     .replace(/[^\p{L}\d\s.&'-]/gu, " ")
     .replace(/\s+/g, " ")
     .trim();
@@ -106,21 +181,37 @@ function cleanPersonOrCompanyName(value) {
   return cleaned.slice(0, 80);
 }
 
+function looksLikeDate(value) {
+  return /^\d{1,2}[.\/-]\d{1,2}[.\/-]\d{2,4}$/.test(String(value || "").trim());
+}
+
 function extractLabeledValue(lines, labelPatterns) {
-  for (const line of lines) {
+  for (let i = 0; i < lines.length; i++) {
+    const line = lines[i];
     for (const pattern of labelPatterns) {
-      const re = new RegExp("(?:^|\\b)" + pattern + "\\s*[:.]?\\s*(.+)$", "i");
+      const re = new RegExp("(?:^|\\b)" + pattern + "\\s*[:.#]?\\s*(.*)$", "i");
       const m = line.match(re);
-      if (m && m[1] && m[1].trim().length > 1) {
-        const val = m[1].trim();
-        // "Müşteri Bilgileri" gibi başlıkları isim sanma
-        if (isNoiseName(val)) continue;
-        if (/^(bilgileri|adı|soyadı)\b/i.test(val)) continue;
-        return val;
+      if (!m) continue;
+      let val = (m[1] || "").trim();
+      if (!val || isNoiseName(val) || /^(number|no\.?|numaras[ıi])\b/i.test(val)) {
+        const next = (lines[i + 1] || "").trim();
+        if (next && next.length > 1 && next.length < 80 && !isNoiseName(next)) val = next;
+        else continue;
       }
+      if (isNoiseName(val)) continue;
+      if (/^(bilgileri|adı|soyadı)\b/i.test(val)) continue;
+      val = val.split(/\s+(?:Total|Subtotal|Amount Due|Balance Due|Due Date|Invoice Date|Genel Toplam|Vade|Tarih)\b/i)[0].trim();
+      if (!val) continue;
+      return val;
     }
   }
   return null;
+}
+
+function extractLabeledDate(lines, labelPatterns) {
+  const val = extractLabeledValue(lines, labelPatterns);
+  if (!val) return null;
+  return extractDate(val) || extractDate(String(val).replace(/[^\d./-]+/g, " "));
 }
 
 function extractCariAdi(lines) {
@@ -175,21 +266,40 @@ function extractVendorName(lines) {
   return null;
 }
 
-function extractFaturaNo(lines) {
-  const value = extractLabeledValue(lines, [
+function cleanFaturaNo(value) {
+  if (!value) return null;
+  let v = String(value).replace(/^[#:\-–]+\s*/, "").trim();
+  v = v.replace(/\s+/g, " ");
+  if (!v || isNoiseName(v) || looksLikeDate(v)) return null;
+  if (v.length > 40) return null;
+  if (/fatura\s*tarih|senaryo|fatura\s*tip|due\s*date|invoice\s*date/i.test(v)) return null;
+  return v;
+}
+
+function extractFaturaNo(lines, text) {
+  const labeled = extractLabeledValue(lines, [
+    "Invoice\\s*Number",
+    "Invoice\\s*No\\.?",
+    "Fatura\\s*Numaras[ıi]",
     "Fatura\\s*No",
     "Fiş\\s*No",
     "Belge\\s*No",
-    "Invoice\\s*#?",
-    "INV\\s*No",
-    "Bill\\s*No",
     "Document\\s*No",
+    "INV\\s*No\\.?",
+    "Bill\\s*No\\.?",
+    "ETTN",
+    "Invoice\\s*#",
   ]);
-  if (!value || isNoiseName(value)) return null;
-  // Not alanına uzun cümle / etiket yığını yazma
-  if (value.length > 40) return null;
-  if (/fatura\s*tarih|senaryo|fatura\s*tip/i.test(value)) return null;
-  return value;
+  const cleaned = cleanFaturaNo(labeled);
+  if (cleaned) return cleaned;
+
+  const gib = String(text || "").match(/\b([A-Z]{3}\d{13})\b/);
+  if (gib) return gib[1];
+  const inv = String(text || "").match(/\b(INV[-/\s]?\d{2,12}(?:[-/]\d{1,12})?)\b/i);
+  if (inv) return inv[1].replace(/\s+/g, "");
+  const hash = String(text || "").match(/\binvoice\s*#\s*([A-Z0-9][-A-Z0-9/]{1,24})/i);
+  if (hash) return cleanFaturaNo(hash[1]);
+  return null;
 }
 
 function extractGenelToplam(text) {
@@ -202,7 +312,7 @@ function extractGenelToplam(text) {
     /genel\s*toplam\D{0,10}([\d\s.,]+)/gi,
     /toplam\s*tutar\D{0,10}([\d\s.,]+)/gi,
     /vergi\s*dahil\s*[oö]denecek\s*tutar\D{0,10}([\d\s.,]+)/gi,
-    /TOTAL\s*[:.]?\s*(?:RM\s*)?([\d\s.,]+)/g,
+    /TOTAL\s*[:.]?\s*(?:RM\s*)?([\d\s.,]+)/gi,
   ];
 
   let best = null;
@@ -287,29 +397,37 @@ function buildFallbackKalem(text) {
   ];
 }
 
-async function extractInvoiceFromDocument(fileBuffer, mimetype) {
-  if (!ALLOWED_OCR_TYPES.has(mimetype)) {
-    const err = new Error(
-      "PDF taraması bu modda desteklenmiyor, lütfen fotoğraf (JPG/PNG/WEBP) olarak yükleyin."
-    );
+async function extractInvoiceFromDocument(fileBuffer, mimetype, originalname = "") {
+  let text = "";
+  const isPdf = mimetype === PDF_TYPE || /\.pdf$/i.test(originalname || "");
+
+  if (isPdf) {
+    text = await extractPdfText(fileBuffer);
+    if (!text || text.trim().length < 8) {
+      const err = new Error(
+        "Bu PDF’den metin okunamadı (taranmış görüntü olabilir). Sayfayı JPG/PNG kaydedip yükleyin."
+      );
+      err.status = 422;
+      throw err;
+    }
+  } else if (ALLOWED_OCR_TYPES.has(mimetype)) {
+    let processed;
+    try {
+      processed = await preprocessImage(fileBuffer);
+    } catch {
+      processed = fileBuffer;
+    }
+    try {
+      text = await runOcr(processed);
+    } catch {
+      const wrapped = new Error("Görüntü okunamadı (OCR başarısız oldu)");
+      wrapped.status = 502;
+      throw wrapped;
+    }
+  } else {
+    const err = new Error("JPG, PNG, WEBP veya PDF yükleyin.");
     err.status = 400;
     throw err;
-  }
-
-  let processed;
-  try {
-    processed = await preprocessImage(fileBuffer);
-  } catch {
-    processed = fileBuffer;
-  }
-
-  let text;
-  try {
-    text = await runOcr(processed);
-  } catch (err) {
-    const wrapped = new Error("Görüntü okunamadı (OCR başarısız oldu)");
-    wrapped.status = 502;
-    throw wrapped;
   }
 
   if (!text || text.trim().length < 5) {
@@ -324,8 +442,22 @@ async function extractInvoiceFromDocument(fileBuffer, mimetype) {
     .filter(Boolean);
 
   const cari_adi = extractCariAdi(lines) || extractVendorName(lines);
-  const tarih = extractDate(text);
-  const fatura_notu = extractFaturaNo(lines);
+  const tarih =
+    extractLabeledDate(lines, [
+      "Fatura\\s*Tarihi",
+      "Kesim\\s*Tarihi",
+      "Invoice\\s*Date",
+      "Issue\\s*Date",
+      "Tarih",
+    ]) || extractDate(text);
+  const vade_tarihi = extractLabeledDate(lines, [
+    "Vade\\s*Tarihi",
+    "Vade",
+    "Due\\s*Date",
+    "Payment\\s*Due",
+    "[OÖ]deme\\s*Tarihi",
+  ]);
+  const fatura_no = extractFaturaNo(lines, text);
 
   let kalemler = extractKalemler(lines);
   if (kalemler.length === 0) {
@@ -335,15 +467,16 @@ async function extractInvoiceFromDocument(fileBuffer, mimetype) {
   return {
     cari_adi,
     tarih,
-    vade_tarihi: null,
-    fatura_notu,
+    vade_tarihi,
+    fatura_no,
+    fatura_notu: fatura_no ? "Kaynak belge no: " + fatura_no : null,
     kalemler,
     _raw_text: text,
   };
 }
 
-async function extractExpenseFromDocument(fileBuffer, mimetype) {
-  const inv = await extractInvoiceFromDocument(fileBuffer, mimetype);
+async function extractExpenseFromDocument(fileBuffer, mimetype, originalname = "") {
+  const inv = await extractInvoiceFromDocument(fileBuffer, mimetype, originalname);
   const text = inv._raw_text || "";
   const lines = text
     .split("\n")

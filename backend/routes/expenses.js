@@ -17,7 +17,7 @@ router.post("/scan", upload.single("fis"), async (req, res) => {
   }
   try {
     const fileBuffer = fs.readFileSync(req.file.path);
-    const extracted = await extractExpenseFromDocument(fileBuffer, req.file.mimetype);
+    const extracted = await extractExpenseFromDocument(fileBuffer, req.file.mimetype, req.file.originalname);
     res.json(extracted);
   } catch (err) {
     console.error(err);
@@ -135,7 +135,7 @@ router.post("/upload", upload.single("fis"), async (req, res) => {
   }
   try {
     const fileBuffer = fs.readFileSync(req.file.path);
-    const ocr = await extractExpenseFromDocument(fileBuffer, req.file.mimetype);
+    const ocr = await extractExpenseFromDocument(fileBuffer, req.file.mimetype, req.file.originalname);
     res.status(201).json({
       belge_yolu: `/uploads/${req.file.filename}`,
       ocr,

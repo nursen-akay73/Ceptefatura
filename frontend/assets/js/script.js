@@ -39,14 +39,22 @@
     setTimeout(() => {
       el.classList.add("is-done");
       setTimeout(() => el.remove(), 450);
-    }, 1250);
+    }, 1800);
     try { sessionStorage.setItem("cf_splash", "1"); } catch {}
   }
 
   function start() {
+    const isLogin = /login\.html$/i.test(location.pathname);
     const hasSplash = !!document.getElementById("app-splash");
     let seen = false;
     try { seen = sessionStorage.getItem("cf_splash") === "1"; } catch {}
+
+    if (isLogin) {
+      if (!hasSplash) mountSplash();
+      dismissSplash();
+      return;
+    }
+
     if (hasSplash) {
       if (seen) {
         document.getElementById("app-splash")?.remove();
@@ -148,25 +156,20 @@ document.addEventListener("DOMContentLoaded", () => {
     fab.textContent = "+";
     document.body.appendChild(fab);
     document.body.classList.add("has-fab");
-  } else if (page === "accounts") {
-    const fab = document.createElement("button");
-    fab.type = "button";
-    fab.className = "fab";
-    fab.setAttribute("aria-label", "Yeni cari");
-    fab.textContent = "+";
-    fab.addEventListener("click", () => document.getElementById("btn-open-new")?.click());
-    document.body.appendChild(fab);
-    document.body.classList.add("has-fab");
   }
 
-  if (!document.body.classList.contains("auth-page")) {
+  if (!document.body.classList.contains("auth-page") && page !== "about") {
     mountCepteAsistan(page);
   }
 
-  document.querySelectorAll("[data-demo-link]").forEach(btn => {
-    btn.addEventListener("click", () => {
-      const target = btn.getAttribute("data-demo-link");
-      if (target) window.location.href = target;
+  document.querySelectorAll("[data-open-app]").forEach((el) => {
+    el.addEventListener("click", (e) => {
+      let logged = false;
+      try { logged = Boolean(localStorage.getItem("token")); } catch {}
+      if (logged) {
+        e.preventDefault();
+        window.location.href = "dashboard.html";
+      }
     });
   });
 
@@ -232,11 +235,9 @@ document.addEventListener("DOMContentLoaded", () => {
           } catch {}
         }
         if (mode === "register") {
-          showToast("Kayıt oluşturuldu");
-          window.location.href = "login.html";
-        } else {
-          window.location.href = "dashboard.html";
+          showToast("Kayıt oluşturuldu, panele alınıyorsunuz");
         }
+        window.location.href = "dashboard.html";
       } catch {
         showToast("Sunucuya bağlanılamadı. npm run dev çalışıyor mu?", "error");
       } finally {
@@ -634,21 +635,38 @@ async function applyUserMenu() {
 
 /* --- Bildirim zili: vadesi yaklaşan/geçen faturalar için otomatik hatırlatmalar --- */
 let _notifPollHandle = null;
+let _lastNotifUnread = null;
 
 function dateTrShort(d) {
   return d ? new Date(d).toLocaleDateString("tr-TR") : "";
 }
 
+function shakeNotifBell() {
+  const bell = document.getElementById("notif-bell");
+  if (!bell) return;
+  bell.classList.remove("is-ringing");
+  void bell.offsetWidth;
+  bell.classList.add("is-ringing");
+  window.setTimeout(() => bell.classList.remove("is-ringing"), 800);
+}
+
 function paintNotifBadge(count) {
   const badge = document.getElementById("notif-badge");
-  if (!badge) return;
-  if (!count) {
-    badge.hidden = true;
-    badge.textContent = "0";
-  } else {
-    badge.hidden = false;
-    badge.textContent = count > 9 ? "9+" : String(count);
+  const bell = document.getElementById("notif-bell");
+  const n = Number(count) || 0;
+  if (badge) {
+    if (!n) {
+      badge.hidden = true;
+      badge.textContent = "0";
+    } else {
+      badge.hidden = false;
+      badge.textContent = n > 9 ? "9+" : String(n);
+    }
   }
+  bell?.classList.toggle("has-unread", n > 0);
+  if (_lastNotifUnread != null && n > _lastNotifUnread) shakeNotifBell();
+  else if (_lastNotifUnread == null && n > 0) shakeNotifBell();
+  _lastNotifUnread = n;
 }
 
 async function loadNotifUnreadCount() {
@@ -663,8 +681,7 @@ async function loadNotifList() {
   if (!list) return;
   list.innerHTML = '<p class="muted notif-empty">Yükleniyor…</p>';
   try {
-    // Panel her açıldığında güncel veriyle taransın (arka plan zamanlayıcısını beklemeden).
-    await apiFetch("/api/notifications/sweep", { method: "POST" }).catch(() => {});
+    await apiFetch("/api/notifications/sweep", { method: "POST" });
     const items = await apiFetch("/api/notifications");
     renderNotifList(items || []);
     const unread = (items || []).filter((n) => n.durum === "okunmadi").length;
@@ -672,6 +689,21 @@ async function loadNotifList() {
   } catch (err) {
     list.innerHTML = `<p class="muted notif-empty">Bildirimler alınamadı.</p>`;
   }
+}
+
+function notifKind(n) {
+  if (n.tur === "vade_gecti") {
+    return {
+      title: "Vade geçti",
+      kind: "danger",
+      icon: '<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="12" x2="12" y1="8" y2="12"/><line x1="12" x2="12.01" y1="16" y2="16"/></svg>',
+    };
+  }
+  return {
+    title: "Vade yaklaşıyor",
+    kind: "warn",
+    icon: '<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>',
+  };
 }
 
 function renderNotifList(items) {
@@ -683,13 +715,19 @@ function renderNotifList(items) {
     return;
   }
   items.forEach((n) => {
+    const meta = notifKind(n);
     const btn = document.createElement("button");
     btn.type = "button";
     btn.className = "notif-item" + (n.durum === "okunmadi" ? " is-unread" : "");
     btn.dataset.id = n.id;
     btn.innerHTML = `
-      <span class="notif-item-top"><span class="notif-item-dot"></span><span class="notif-item-msg"></span></span>
-      <span class="notif-item-time"></span>`;
+      <span class="notif-ic ${meta.kind}">${meta.icon}</span>
+      <span class="notif-item-body">
+        <span class="notif-item-title"></span>
+        <span class="notif-item-msg"></span>
+        <span class="notif-item-time"></span>
+      </span>`;
+    btn.querySelector(".notif-item-title").textContent = meta.title;
     btn.querySelector(".notif-item-msg").textContent = n.mesaj;
     btn.querySelector(".notif-item-time").textContent = dateTrShort(n.created_at);
     btn.addEventListener("click", async () => {
@@ -990,6 +1028,135 @@ function showToast(message, type = "success") {
   setTimeout(() => el.remove(), 4000);
 }
 
+function closeIyzicoPayPanel() {
+  const overlay = document.getElementById("iyzico-pay-overlay");
+  if (!overlay) return;
+  overlay.classList.remove("active");
+  const slot = overlay.querySelector("[data-iyzico-slot]");
+  if (slot) slot.innerHTML = "";
+}
+
+function injectHtmlWithScripts(container, html) {
+  const tmp = document.createElement("div");
+  tmp.innerHTML = html;
+  tmp.querySelectorAll("script").forEach((old) => {
+    const s = document.createElement("script");
+    [...old.attributes].forEach((a) => s.setAttribute(a.name, a.value));
+    s.textContent = old.textContent;
+    old.replaceWith(s);
+  });
+  while (tmp.firstChild) container.appendChild(tmp.firstChild);
+}
+
+function iyzicoDemoMarkup(data) {
+  const amount = data.amountLabel || ("₺" + Number(data.amount || 0).toLocaleString("tr-TR", { minimumFractionDigits: 2 }));
+  const no = escapeHtml(data.fatura_no || "—");
+  const cari = escapeHtml(data.cari_adi || "—");
+  return `
+    <div class="iyzico-demo">
+      <div class="iyzico-demo-brand">
+        <svg viewBox="0 0 92 24" width="92" height="24" aria-label="iyzico">
+          <text x="0" y="18" font-family="Arial, sans-serif" font-weight="800" font-size="20" fill="#1A5CFF">iyzico</text>
+        </svg>
+        <span>Güvenli ödeme</span>
+      </div>
+      <div class="iyzico-demo-summary">
+        <div>
+          <small>Fatura</small>
+          <strong>${no}</strong>
+        </div>
+        <div>
+          <small>Cari</small>
+          <strong>${cari}</strong>
+        </div>
+        <div class="iyzico-demo-amount">${escapeHtml(amount)}</div>
+      </div>
+      <label>Kart üzerindeki isim
+        <input type="text" autocomplete="cc-name" placeholder="AD SOYAD">
+      </label>
+      <label>Kart numarası
+        <input type="text" data-iyzico-pan inputmode="numeric" maxlength="19" placeholder="XXXX XXXX XXXX XXXX" autocomplete="cc-number">
+      </label>
+      <div class="iyzico-demo-row">
+        <label>Son kullanma
+          <input type="text" data-iyzico-exp inputmode="numeric" maxlength="5" placeholder="AA/YY" autocomplete="cc-exp">
+        </label>
+        <label>CVC
+          <input type="text" inputmode="numeric" maxlength="4" placeholder="***" autocomplete="cc-csc">
+        </label>
+      </div>
+      <button type="button" class="iyzico-demo-pay" data-iyzico-pay>${escapeHtml(amount)} Öde</button>
+      <p class="iyzico-demo-note">3D Secure ile güvence altında. Bu ekran demodur; gerçek tahsilat iyzico anahtarı bağlanınca burada tamamlanır.</p>
+    </div>`;
+}
+
+function bindIyzicoDemoUi(slot) {
+  const pan = slot.querySelector("[data-iyzico-pan]");
+  const exp = slot.querySelector("[data-iyzico-exp]");
+  pan?.addEventListener("input", () => {
+    const digits = pan.value.replace(/\D/g, "").slice(0, 16);
+    pan.value = digits.replace(/(\d{4})(?=\d)/g, "$1 ").trim();
+  });
+  exp?.addEventListener("input", () => {
+    const digits = exp.value.replace(/\D/g, "").slice(0, 4);
+    exp.value = digits.length > 2 ? digits.slice(0, 2) + "/" + digits.slice(2) : digits;
+  });
+  slot.querySelector("[data-iyzico-pay]")?.addEventListener("click", () => {
+    showToast("Demo iyzico ekranı — fatura ödenmedi. Canlı anahtar bağlanınca tahsilat burada alınır.");
+    closeIyzicoPayPanel();
+  });
+}
+
+function openIyzicoPayPanel(data) {
+  let overlay = document.getElementById("iyzico-pay-overlay");
+  if (!overlay) {
+    overlay = document.createElement("div");
+    overlay.id = "iyzico-pay-overlay";
+    overlay.className = "iyzico-pay-overlay";
+    overlay.innerHTML = `
+      <div class="iyzico-pay-card" role="dialog" aria-modal="true" aria-label="iyzico ödeme">
+        <div class="iyzico-pay-head">
+          <img class="iyzico-pay-brand" src="../assets/img/logo.png" alt="CepteFatura">
+          <strong>iyzico ile öde</strong>
+          <span class="iyzico-demo-badge" data-iyzico-demo-badge hidden>Demo</span>
+          <button type="button" class="modal-close" data-iyzico-close aria-label="Kapat">&times;</button>
+        </div>
+        <div class="iyzico-pay-body" data-iyzico-slot></div>
+      </div>`;
+    overlay.addEventListener("click", (e) => {
+      if (e.target === overlay) closeIyzicoPayPanel();
+    });
+    overlay.querySelector("[data-iyzico-close]").addEventListener("click", closeIyzicoPayPanel);
+    document.body.appendChild(overlay);
+  }
+
+  const slot = overlay.querySelector("[data-iyzico-slot]");
+  const badge = overlay.querySelector("[data-iyzico-demo-badge]");
+  slot.innerHTML = "";
+
+  if (data.checkoutFormContent && !data.demo) {
+    badge.hidden = true;
+    const formBox = document.createElement("div");
+    formBox.id = "iyzipay-checkout-form";
+    formBox.className = "responsive";
+    slot.appendChild(formBox);
+    injectHtmlWithScripts(slot, data.checkoutFormContent);
+  } else if (data.paymentPageUrl && !data.demo) {
+    badge.hidden = true;
+    const iframe = document.createElement("iframe");
+    iframe.className = "iyzico-pay-frame";
+    iframe.title = "iyzico ödeme";
+    iframe.src = data.paymentPageUrl;
+    slot.appendChild(iframe);
+  } else {
+    badge.hidden = false;
+    slot.innerHTML = iyzicoDemoMarkup(data);
+    bindIyzicoDemoUi(slot);
+  }
+
+  overlay.classList.add("active");
+}
+
 let _activeSpeechRecognition = null;
 let _activeMicStream = null;
 
@@ -1000,7 +1167,7 @@ function stopMicStream() {
   }
 }
 
-async function startSpeechToText(inputEl, micBtn, onEnd) {
+async function startSpeechToText(inputEl, micBtn, onEnd, toastMsg) {
   const SpeechRecognitionImpl = window.SpeechRecognition || window.webkitSpeechRecognition;
   if (!SpeechRecognitionImpl) {
     showToast("Ses tanıma bu tarayıcıda yok. Chrome kullanın.", "error");
@@ -1109,7 +1276,7 @@ async function startSpeechToText(inputEl, micBtn, onEnd) {
   micBtn.title = "Dinleniyor… Bitirmek için tekrar tıklayın";
   inputEl.placeholder = "Şimdi net konuşun…";
   inputEl.value = "";
-  showToast("Mikrofon açık — şimdi konuşun (örn. yeni fatura aç)");
+  showToast(toastMsg || "Mikrofon açık — şimdi konuşun (örn. yeni fatura aç)");
 
   recognition.onresult = (event) => {
     interimTranscript = "";
@@ -1205,25 +1372,417 @@ function escapeHtml(s) {
     .replace(/"/g, "&quot;");
 }
 
+const CF_VOICE_FILL_KEY = "cf_voice_fill";
+const CF_VOICE_FORM_PAGES = ["invoice-new", "invoice-template", "expense-new"];
+
+function normalizeSpokenAmount(raw) {
+  let s = String(raw || "").replace(/\s/g, "");
+  if (s.includes(",")) s = s.replace(/\./g, "").replace(",", ".");
+  else if (/^\d{1,3}(\.\d{3})+$/.test(s)) s = s.replace(/\./g, "");
+  const n = Number(s);
+  return Number.isFinite(n) && n > 0 ? Math.round(n * 100) / 100 : null;
+}
+
+function parseTrNumberWords(span) {
+  const ones = { sifir: 0, bir: 1, iki: 2, uc: 3, dort: 4, bes: 5, alti: 6, yedi: 7, sekiz: 8, dokuz: 9 };
+  const tens = { on: 10, yirmi: 20, otuz: 30, kirk: 40, elli: 50, altmis: 60, yetmis: 70, seksen: 80, doksan: 90 };
+  let total = 0;
+  let current = 0;
+  let found = false;
+  String(span || "").split(/\s+/).forEach((t) => {
+    if (ones[t] != null) {
+      current += ones[t];
+      found = true;
+      return;
+    }
+    if (tens[t] != null) {
+      current += tens[t];
+      found = true;
+      return;
+    }
+    if (t === "yuz") {
+      current = (current || 1) * 100;
+      found = true;
+      return;
+    }
+    if (t === "bin") {
+      total += (current || 1) * 1000;
+      current = 0;
+      found = true;
+      return;
+    }
+    if (t === "milyon") {
+      total += (current || 1) * 1000000;
+      current = 0;
+      found = true;
+    }
+  });
+  total += current;
+  return found && total > 0 ? total : null;
+}
+
+function parseVoiceAmount(raw) {
+  const folded = foldTr(raw);
+  const withBin = folded.match(/(\d+(?:[.,]\d+)?)\s*bin(?:\s*(?:tl|lira|liralik))?/);
+  if (withBin) {
+    const n = Number(String(withBin[1]).replace(",", "."));
+    if (n > 0) return Math.round(n * 1000 * 100) / 100;
+  }
+  const currency = folded.match(/(\d{1,3}(?:[.\s]\d{3})*(?:,\d+)?|\d+(?:[.,]\d+)?)\s*(?:tl|lira|liralik|turk\s*lirasi)/);
+  if (currency) return normalizeSpokenAmount(currency[1]);
+  const tutar = folded.match(/\btutar(?:i)?\s*[:\-]?\s*(\d{1,3}(?:[.\s]\d{3})*(?:,\d+)?|\d+(?:[.,]\d+)?)/);
+  if (tutar) return normalizeSpokenAmount(tutar[1]);
+  const words = folded.match(/((?:sifir|bir|iki|uc|dort|bes|alti|yedi|sekiz|dokuz|on|yirmi|otuz|kirk|elli|altmis|yetmis|seksen|doksan|yuz|bin|milyon)\s*){1,10}(?:tl|lira|liralik)/);
+  if (words) return parseTrNumberWords(words[0]);
+  return null;
+}
+
+function parseVoiceVat(raw) {
+  const folded = foldTr(raw);
+  if (/\b(kdvsiz|kdv\s*siz|kdv\s*yok|kdv\s*sifir)\b/.test(folded)) return 0;
+  const m = folded.match(/\b(?:kdv|yuzde)\s*%?\s*(20|10|1|0)\b/);
+  if (m) return Number(m[1]);
+  return 20;
+}
+
+function parseVoiceQty(raw) {
+  const folded = foldTr(raw);
+  const m = folded.match(/\b(\d+)\s*(?:adet|tane)\b/) || folded.match(/\bmiktar\s*[:\-]?\s*(\d+)/);
+  const n = m ? Number(m[1]) : 1;
+  return n > 0 ? n : 1;
+}
+
+function cleanSpokenItem(text) {
+  return foldTr(text)
+    .replace(/\b(fatura|faturasi|kes|kestim|keseyim|keselim|olustur|kaydet|gonder|lira|liralik|tl|tutar|cari|musteri|sirket|firma|kalem|kalemler|kdv|yuzde|adet|tane|miktar)\b/g, " ")
+    .replace(/\d+(?:[.,]\d+)?/g, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
+function extractSpokenCari(raw) {
+  const folded = foldTr(raw);
+  const labeled = folded.match(/\b(?:cari|musteri|sirket|firma)(?:\s+(?:adi|ismi|unvani))?\s+(.+?)(?=\s+(?:icin|tutar|kalem|lira|tl|liralik|fatura|\d)|$)/);
+  if (labeled && labeled[1].trim().length >= 2 && !/^hesap/.test(labeled[1].trim())) {
+    return labeled[1].replace(/\b(icin|adli|olan)\b/g, " ").replace(/\s+/g, " ").trim();
+  }
+  const icin = raw.match(/(.+?)\s+i[cç]in\b/i);
+  if (icin) {
+    return icin[1].replace(/^\s*(cari|müşteri|musteri|şirket|sirket|firma)\s+/i, "").trim();
+  }
+  const dat = raw.match(/([A-Za-zÇĞİÖŞÜçğıöşü0-9. ]{2,80}?)(?:[''](?:y?[eEaA]|n[eEaA])|\s+[eEaA])\s+/);
+  if (dat) return dat[1].trim();
+  return "";
+}
+
+function extractSpokenItem(raw) {
+  const folded = foldTr(raw);
+  const kalem = folded.match(/\bkalem(?:ler(?:i)?)?\s+(.+?)(?=\s+(?:tutar|cari|musteri|lira|tl)|$)/);
+  if (kalem) {
+    const cleaned = cleanSpokenItem(kalem[1]);
+    if (cleaned) return cleaned;
+  }
+  const afterAmount = folded.match(/(?:liralik|lira|tl)\s+(.+)$/);
+  if (afterAmount) {
+    const cleaned = cleanSpokenItem(afterAmount[1]);
+    if (cleaned) return cleaned;
+  }
+  return "";
+}
+
+function matchCariOption(spoken, extractedName, selectEl) {
+  if (!selectEl) return null;
+  const q = foldTr(spoken);
+  const ex = foldTr(extractedName);
+  let best = null;
+  let score = 0;
+  [...selectEl.options].forEach((opt) => {
+    if (!opt.value) return;
+    const name = foldTr(opt.text);
+    if (name.length < 2) return;
+    let s = 0;
+    if (q.includes(name)) s = 100 + name.length;
+    else if (ex.length >= 3 && (name.includes(ex) || ex.includes(name))) s = 60 + Math.min(name.length, ex.length);
+    else {
+      const toks = name.split(" ").filter((t) => t.length > 2);
+      const hits = toks.filter((t) => q.includes(t) || (ex && ex.includes(t))).length;
+      if (hits && hits >= Math.ceil(toks.length / 2)) s = 20 + hits * 6;
+    }
+    if (s > score) {
+      score = s;
+      best = opt;
+    }
+  });
+  return best;
+}
+
+function looksLikeVoiceFill(raw, page) {
+  const q = foldTr(raw);
+  if (!q) return false;
+  if (/kac\s+(tane\s+)?(fatura|gider)|nasil\s+|ne\s+demek|ne\s+anlama|ne\s+ise\s+yarar|pdf\s+nasil|durumlar/.test(q)) {
+    return false;
+  }
+  if (/^(yeni\s+fatura\s+ac|giderlere\s+git|cari\s+hesaplar|raporlari?\s+goster|ana\s+sayfa)$/.test(q)) {
+    return false;
+  }
+  const amount = parseVoiceAmount(raw);
+  const hasCariPhrase = /\b(cari|musteri|sirket|firma)\s+\S+/.test(q) && !/cari\s+hesap/.test(q);
+  const hasFillVerb = /\b(doldur|kalem|fatura\s+kes|liralik)\b/.test(q);
+  if (CF_VOICE_FORM_PAGES.includes(page)) {
+    const select = document.getElementById("select-cari") || document.getElementById("customer_id");
+    if (select && matchCariOption(raw, extractSpokenCari(raw), select)) return true;
+    return !!(amount || hasCariPhrase || hasFillVerb || /\b(icin|lira|tl)\b/.test(q));
+  }
+  if (amount && (hasCariPhrase || /fatura/.test(q))) return true;
+  if (amount && /gider/.test(q) && /(kaydet|ekle|yaz|doldur)/.test(q)) return true;
+  return false;
+}
+
+function parseVoiceFormFill(raw, page) {
+  const q = foldTr(raw);
+  const amount = parseVoiceAmount(raw);
+  const vat = parseVoiceVat(raw);
+  const qty = parseVoiceQty(raw);
+  const item = extractSpokenItem(raw);
+  const cari = extractSpokenCari(raw);
+  const isExpense = page === "expense-new" || (/gider/.test(q) && !/fatura/.test(q) && amount);
+  const isTemplate = page === "invoice-template";
+  if (isExpense) {
+    return {
+      kind: "expense",
+      targetPage: "expense-new",
+      firma: cari,
+      tutar: amount,
+      aciklama: item || cari,
+    };
+  }
+  const kalemler = [];
+  if (item || amount) {
+    kalemler.push({
+      aciklama: item || "Hizmet",
+      miktar: qty,
+      birim_fiyat: amount || 0,
+      kdv_orani: vat,
+    });
+  }
+  return {
+    kind: isTemplate ? "template" : "invoice",
+    targetPage: isTemplate ? "invoice-template" : "invoice-new",
+    cari_adi: cari,
+    kalemler,
+    fatura_notu: item || "",
+  };
+}
+
+function applyRowVoiceFill(row, item) {
+  if (!row || !item) return;
+  const desc = row.querySelector(".item-desc");
+  const qty = row.querySelector(".item-qty");
+  const price = row.querySelector(".item-price");
+  const vat = row.querySelector(".item-vat");
+  if (desc && item.aciklama) desc.value = item.aciklama;
+  if (qty && item.miktar != null) qty.value = item.miktar;
+  if (price && item.birim_fiyat != null) price.value = item.birim_fiyat;
+  if (vat && item.kdv_orani != null) vat.value = String(item.kdv_orani);
+}
+
+function applyInvoiceVoiceFill(data) {
+  const select = document.getElementById("select-cari");
+  if (!select) return { ok: false, summary: "" };
+  const parts = [];
+  if (data.cari_adi || data.spoken) {
+    const opt = matchCariOption(data.spoken || data.cari_adi, data.cari_adi, select);
+    const hint = document.getElementById("ocr-cari-hint");
+    if (opt) {
+      select.value = opt.value;
+      parts.push(opt.text + " seçildi");
+      if (hint) {
+        hint.hidden = true;
+        hint.textContent = "";
+      }
+    } else if (data.cari_adi) {
+      parts.push('cari listede yok: "' + data.cari_adi + '"');
+      if (hint) {
+        hint.hidden = false;
+        hint.textContent = 'Sesten anlaşılan cari: "' + data.cari_adi + '". Listede yok — seçin veya Cari Hesaplar’dan ekleyin.';
+      }
+    }
+  }
+  const kalemler = Array.isArray(data.kalemler) ? data.kalemler.filter((k) => k && (k.aciklama || k.birim_fiyat)) : [];
+  if (kalemler.length) {
+    const first = document.querySelector("#items-body tr");
+    if (first) applyRowVoiceFill(first, kalemler[0]);
+    for (let i = 1; i < kalemler.length; i += 1) {
+      document.getElementById("btn-add-row")?.click();
+      const rows = document.querySelectorAll("#items-body tr");
+      applyRowVoiceFill(rows[rows.length - 1], kalemler[i]);
+    }
+    const k = kalemler[0];
+    if (k.aciklama) parts.push("kalem: " + k.aciklama);
+    if (k.birim_fiyat) parts.push("tutar ₺" + Number(k.birim_fiyat).toLocaleString("tr-TR"));
+    document.querySelector("#items-body")?.dispatchEvent(new Event("input", { bubbles: true }));
+  }
+  if (data.fatura_notu) {
+    const note = document.getElementById("fatura_notu");
+    if (note && !note.value) note.value = data.fatura_notu;
+  }
+  return { ok: parts.length > 0, summary: parts.join(". ") };
+}
+
+function applyTemplateVoiceFill(data) {
+  const select = document.getElementById("customer_id");
+  if (!select) return { ok: false, summary: "" };
+  const parts = [];
+  if (data.cari_adi) {
+    const opt = matchCariOption(data.cari_adi, data.cari_adi, select);
+    if (opt) {
+      select.value = opt.value;
+      parts.push(opt.text + " seçildi");
+    } else {
+      parts.push('cari listede yok: "' + data.cari_adi + '"');
+    }
+  }
+  const item = (data.kalemler && data.kalemler[0]) || {};
+  const aciklama = document.getElementById("aciklama");
+  const miktar = document.getElementById("miktar");
+  const fiyat = document.getElementById("birim_fiyat");
+  const kdv = document.getElementById("kdv_orani");
+  if (aciklama && item.aciklama) {
+    aciklama.value = item.aciklama;
+    parts.push("açıklama: " + item.aciklama);
+  }
+  if (miktar && item.miktar != null) miktar.value = item.miktar;
+  if (fiyat && item.birim_fiyat) {
+    fiyat.value = item.birim_fiyat;
+    parts.push("tutar ₺" + Number(item.birim_fiyat).toLocaleString("tr-TR"));
+  }
+  if (kdv && item.kdv_orani != null) kdv.value = item.kdv_orani;
+  return { ok: parts.length > 0, summary: parts.join(". ") };
+}
+
+function applyExpenseVoiceFill(data) {
+  const firma = document.getElementById("gider-firma");
+  const tutar = document.getElementById("gider-tutar");
+  const aciklama = document.getElementById("gider_aciklama");
+  if (!tutar && !firma) return { ok: false, summary: "" };
+  const parts = [];
+  if (firma && data.firma) {
+    firma.value = data.firma;
+    parts.push("firma: " + data.firma);
+  }
+  if (tutar && data.tutar) {
+    tutar.value = data.tutar;
+    parts.push("tutar ₺" + Number(data.tutar).toLocaleString("tr-TR"));
+  }
+  if (aciklama && data.aciklama) {
+    aciklama.value = data.aciklama;
+    parts.push("açıklama yazıldı");
+  }
+  return { ok: parts.length > 0, summary: parts.join(". ") };
+}
+
+function applyVoiceFillToPage(data) {
+  const page = document.body.dataset.page;
+  if (page === "invoice-new") return applyInvoiceVoiceFill(data);
+  if (page === "invoice-template") return applyTemplateVoiceFill(data);
+  if (page === "expense-new") return applyExpenseVoiceFill(data);
+  return { ok: false, summary: "" };
+}
+
+function applyVoiceFillWhenReady(data, attempt) {
+  const page = document.body.dataset.page;
+  const select = page === "invoice-template"
+    ? document.getElementById("customer_id")
+    : document.getElementById("select-cari");
+  const needsCari = (page === "invoice-new" || page === "invoice-template") && data.cari_adi;
+  const loaded = select && [...select.options].some((o) => o.value);
+  if (needsCari && !loaded && (attempt || 0) < 15) {
+    return new Promise((resolve) => {
+      setTimeout(() => resolve(applyVoiceFillWhenReady(data, (attempt || 0) + 1)), 200);
+    });
+  }
+  return Promise.resolve(applyVoiceFillToPage(data));
+}
+
+function takePendingVoiceFill() {
+  try {
+    const raw = sessionStorage.getItem(CF_VOICE_FILL_KEY);
+    if (!raw) return null;
+    sessionStorage.removeItem(CF_VOICE_FILL_KEY);
+    return JSON.parse(raw);
+  } catch {
+    return null;
+  }
+}
+
+function voiceFillHref(targetPage) {
+  if (targetPage === "expense-new") return "expense-new.html";
+  if (targetPage === "invoice-template") return "invoice-template.html";
+  return "invoice-new.html";
+}
+
+async function tryVoiceFormFill(message, page) {
+  if (!looksLikeVoiceFill(message, page)) return null;
+  const parsed = parseVoiceFormFill(message, page);
+  parsed.spoken = message;
+  const hasSomething = parsed.cari_adi || parsed.firma || (parsed.kalemler && parsed.kalemler.length) || parsed.tutar;
+  if (!hasSomething) {
+    return {
+      text: "Cari adı, tutar ve kalemi söyleyin. Örnek: Yılmaz’a 5 bin liralık danışmanlık.",
+    };
+  }
+  if (page === parsed.targetPage) {
+    const result = await applyVoiceFillWhenReady(parsed);
+    if (result.ok) {
+      showToast("Sesle form dolduruldu — kaydetmeden önce kontrol edin");
+      return {
+        text: "Formu doldurdum. " + result.summary + ". Kontrol edip kaydedin; ben faturayı kendim göndermem.",
+      };
+    }
+    return {
+      text: "Sesi aldım ama formu dolduramadım. Cari listede mi bakın; tutarı tekrar söyleyin.",
+    };
+  }
+  try {
+    sessionStorage.setItem(CF_VOICE_FILL_KEY, JSON.stringify(parsed));
+  } catch {}
+  return {
+    text: "Söylediklerinizle formu doldurmak için sayfayı açıyorum.",
+    href: voiceFillHref(parsed.targetPage),
+    hrefLabel: "Formu aç →",
+    autoNav: true,
+  };
+}
+
+function pageListenHint(page) {
+  if (page === "invoice-new" || page === "invoice-template") {
+    return "Mikrofon açık — cari, tutar ve kalemi söyleyin";
+  }
+  if (page === "expense-new") {
+    return "Mikrofon açık — firma, tutar ve açıklamayı söyleyin";
+  }
+  return "Mikrofon açık — şimdi konuşun (örn. yeni fatura aç)";
+}
+
 const CF_ASSISTANT_PAGES = {
   dashboard: {
     title: "Ana Sayfa",
-    hello: "Ana sayfadasınız. Nakit, gelir ve gider özetini buradan görürsünüz. Ne takıldı?",
+    hello: "Ana sayfadasınız. Nakit, gelir ve gider özetini buradan görürsünüz. Mikrofona cari ve tutarı söyleyebilirsiniz.",
     chips: ["Fatura nasıl kesilir?", "Nakit özeti ne anlama geliyor?", "Müşavirimi nasıl davet ederim?"],
   },
   invoices: {
     title: "Faturalar",
-    hello: "Kesilmiş faturalar burada. Detaya tıklayın, PDF alın veya yeni fatura kesin.",
+    hello: "Kesilmiş faturalar burada. Detaya tıklayın, PDF alın veya yeni fatura kesin. Sesle de komut verebilirsiniz.",
     chips: ["Yeni fatura nasıl kesilir?", "Fatura durumları ne demek?", "PDF nasıl alınır?"],
   },
   "invoice-new": {
     title: "Yeni Fatura",
-    hello: "Bu ekranda müşteri, kalem, KDV ve vade girerek e-fatura kesersiniz. Sesle de yazabilirsiniz.",
+    hello: "Yeni fatura formundasınız. Mikrofona örneğin “Yılmaz’a 5 bin liralık danışmanlık” deyin; cari, tutar ve kalem forma dolar. Kaydetmeden önce kontrol edin.",
     chips: ["KDV nasıl hesaplanır?", "Sesle nasıl yazarım?", "Tekrarlayan fatura nedir?"],
   },
   "invoice-template": {
     title: "Otomatik Fatura",
-    hello: "Kira, aidat gibi her ay kesilen faturalar için şablon kurarsınız. Belirlediğiniz günde otomatik oluşur.",
+    hello: "Kira, aidat gibi her ay kesilen faturalar için şablon kurarsınız. Cari ve tutarı sesle söyleyebilirsiniz.",
     chips: ["Tekrarlayan fatura nedir?", "Ne sıklıkta kesilir?", "Şablon nasıl kaydedilir?"],
   },
   expenses: {
@@ -1233,7 +1792,7 @@ const CF_ASSISTANT_PAGES = {
   },
   "expense-new": {
     title: "Yeni Gider",
-    hello: "Fiş fotoğrafını sürükleyin; tutar ve KDV otomatik dolsun. Elle de girebilirsiniz.",
+    hello: "Firma adı, tutar ve açıklamayı söyleyin; form dolar. Fiş fotoğrafını da yükleyebilirsiniz.",
     chips: ["Fiş nasıl yüklenir?", "OCR ne doldurur?", "KDV alış nedir?"],
   },
   accounts: {
@@ -1263,7 +1822,7 @@ const CF_ASSISTANT_KB = [
     q: "Fatura nasıl kesilir?",
     keys: ["fatura", "kes", "yeni fatura", "e fatura", "efatura", "nasil kesilir"],
     pages: ["dashboard", "invoices", "invoice-new", "accounts"],
-    text: "Soldan Yeni Fatura’ya gidin (veya Faturalar’da +). Cari seçin, kalem ekleyin, KDV oranını girin. Kaydet deyince fatura listesine düşer.",
+    text: "Soldan Yeni Fatura’ya gidin. Cari, tutar ve kalemi asistan mikrofona söyleyebilirsiniz; form dolar. Kaydet deyince fatura listesine düşer.",
     href: "invoice-new.html",
     hrefLabel: "Yeni fatura aç",
   },
@@ -1277,7 +1836,7 @@ const CF_ASSISTANT_KB = [
     q: "Sesle nasıl yazarım?",
     keys: ["ses", "mikrofon", "konus", "konusarak", "yazdir", "dikte"],
     pages: ["invoice-new", "invoice-template"],
-    text: "Fatura notu veya kalem yanındaki mikrofon simgesine basın, Chrome veya Edge’de konuşun. Metin alana yazılır. Bu asistan panelindeki mikrofonda da soru sorabilirsiniz.",
+    text: "Asistan panelinde mikrofona basın ve örneğin “Yılmaz’a 5 bin liralık danışmanlık” deyin; cari, tutar ve kalem forma dolar. Kaydetmeden önce kontrol edin. Tek bir alana yazmak için alan yanındaki mikrofonu da kullanabilirsiniz.",
   },
   {
     q: "Tekrarlayan fatura nedir?",
@@ -1477,7 +2036,7 @@ function resolveVoiceCommand(message) {
       text: "Giderler sayfasını açıyorum.",
     },
     {
-      test: /(cari|musteri\s*listesi|carilere)/,
+      test: /(cari\s*hesap|musteri\s*listesi|carilere(\s+git)?)/,
       href: "accounts.html",
       label: "Cari Hesaplar",
       text: "Cari hesaplar sayfasını açıyorum.",
@@ -1602,7 +2161,7 @@ function mountCepteAsistan(page) {
   root.innerHTML = `
     <div class="cf-asst-panel" hidden>
       <div class="cf-asst-head">
-        <img src="../assets/img/logo-icon.png" alt="" width="28" height="28">
+        <img src="../assets/img/asst-icon.png" alt="" width="28" height="28">
         <div>
           <strong>Cepte Asistan</strong>
           <span>${escapeHtml(meta.title)}</span>
@@ -1624,7 +2183,7 @@ function mountCepteAsistan(page) {
       </form>
     </div>
     <button type="button" class="cf-asst-fab" data-asst-toggle aria-label="Cepte Asistan">
-      <img src="../assets/img/logo-icon.png" alt="" width="84" height="84">
+      <img src="../assets/img/asst-icon.png" alt="" width="68" height="68">
     </button>`;
   const backdrop = document.createElement("button");
   backdrop.type = "button";
@@ -1641,18 +2200,69 @@ function mountCepteAsistan(page) {
   const micBtn = root.querySelector("[data-asst-mic]");
   const voiceBtn = root.querySelector("[data-asst-voice]");
   let voiceOn = true;
+  try {
+    voiceOn = localStorage.getItem("cf_asst_voice") !== "0";
+  } catch {}
+  voiceBtn.setAttribute("aria-pressed", voiceOn ? "true" : "false");
+  voiceBtn.title = voiceOn ? "Sesli cevap açık" : "Sesli cevap kapalı";
+  voiceBtn.classList.toggle("is-muted", !voiceOn);
   let busy = false;
 
   function speak(text) {
-    if (!voiceOn || !window.speechSynthesis) return;
-    window.speechSynthesis.cancel();
-    const u = new SpeechSynthesisUtterance(text);
-    u.lang = "tr-TR";
-    u.rate = 1.04;
-    const voices = window.speechSynthesis.getVoices();
-    const tr = voices.find((v) => (v.lang || "").toLowerCase().startsWith("tr"));
-    if (tr) u.voice = tr;
-    window.speechSynthesis.speak(u);
+    return new Promise((resolve) => {
+      if (!voiceOn || !window.speechSynthesis) {
+        resolve();
+        return;
+      }
+      window.speechSynthesis.cancel();
+      const u = new SpeechSynthesisUtterance(text);
+      u.lang = "tr-TR";
+      u.rate = 1.04;
+      const pickVoice = () => {
+        const voices = window.speechSynthesis.getVoices();
+        const tr = voices.find((v) => (v.lang || "").toLowerCase().startsWith("tr"));
+        if (tr) u.voice = tr;
+      };
+      pickVoice();
+      let settled = false;
+      let started = false;
+      const finish = () => {
+        if (settled) return;
+        settled = true;
+        resolve();
+      };
+      u.onstart = () => {
+        started = true;
+      };
+      u.onend = finish;
+      u.onerror = finish;
+      const go = () => {
+        if (settled || started || u._launched) return;
+        u._launched = true;
+        pickVoice();
+        try {
+          window.speechSynthesis.speak(u);
+          window.speechSynthesis.resume();
+        } catch {
+          finish();
+        }
+      };
+      go();
+      if (!window.speechSynthesis.getVoices().length) {
+        window.speechSynthesis.addEventListener("voiceschanged", go, { once: true });
+      }
+      setTimeout(() => {
+        if (!started) finish();
+      }, 2500);
+    });
+  }
+
+  async function speakThenListen(text) {
+    await speak(text);
+    if (panel.hidden) return;
+    startSpeechToText(input, micBtn, (value) => {
+      if (value && value.trim()) send(value, true);
+    }, pageListenHint(page));
   }
 
   function addMsg(role, item) {
@@ -1736,12 +2346,15 @@ function mountCepteAsistan(page) {
     document.body.classList.toggle("asst-open", open);
     if (open) {
       input.focus();
-    } else if (window.speechSynthesis) {
-      window.speechSynthesis.cancel();
+    } else {
+      if (window.speechSynthesis) window.speechSynthesis.cancel();
+      if (_activeSpeechRecognition) {
+        try { _activeSpeechRecognition.stop(); } catch {}
+      }
     }
   }
 
-  async function send(text) {
+  async function send(text, fromVoice) {
     const message = String(text || "").trim();
     if (!message || busy) return;
     busy = true;
@@ -1752,12 +2365,11 @@ function mountCepteAsistan(page) {
     wait.textContent = "Bakıyorum...";
     msgs.appendChild(wait);
     msgs.scrollTop = msgs.scrollHeight;
-    const answer = await askCepteAsistan(message, page);
+    const fill = await tryVoiceFormFill(message, page);
+    const answer = fill || await askCepteAsistan(message, page);
     wait.remove();
     addMsg("bot", answer);
-    // Sayfa açma komutlarını seslendirme (küçük ifadeler)
     if (answer.autoNav && answer.href) {
-      if (window.speechSynthesis) window.speechSynthesis.cancel();
       busy = false;
       showToast((answer.hrefLabel || "Sayfa") + " açılıyor…");
       setTimeout(() => {
@@ -1765,13 +2377,12 @@ function mountCepteAsistan(page) {
       }, 450);
       return;
     }
-    speak(answer.text);
     busy = false;
+    if (fromVoice) speakThenListen(answer.text);
+    else speak(answer.text);
   }
 
-  addMsg("bot", {
-    text: meta.hello + " Mikrofona basıp aşağıdaki kısa komutları söyleyin; yeşil yanınca konuşun, bitince mik’e tekrar basın.",
-  });
+  addMsg("bot", { text: meta.hello });
   addChips();
 
   // Sesli komut kısayolları — tıklayınca da aynı (seslendirilmez)
@@ -1787,11 +2398,22 @@ function mountCepteAsistan(page) {
     const btn = document.createElement("button");
     btn.type = "button";
     btn.textContent = label;
-    btn.title = "Söyle veya tıkla — sayfa açılır, seslendirilmez";
+    btn.title = "Söyle veya tıkla — sayfa açılır";
     btn.addEventListener("click", () => send(label));
     navChips.appendChild(btn);
   });
   msgs.appendChild(navChips);
+
+  const pending = takePendingVoiceFill();
+  if (pending) {
+    applyVoiceFillWhenReady(pending).then((result) => {
+      if (!result.ok) return;
+      addMsg("bot", {
+        text: "Formu doldurdum. " + result.summary + ". Kontrol edip kaydedin; ben faturayı kendim göndermem.",
+      });
+      showToast("Sesle form dolduruldu — kaydetmeden önce kontrol edin");
+    });
+  }
 
   root.querySelector("[data-asst-toggle]").addEventListener("click", () => {
     setOpen(panel.hidden);
@@ -1800,6 +2422,7 @@ function mountCepteAsistan(page) {
   backdrop.addEventListener("click", () => setOpen(false));
   voiceBtn.addEventListener("click", () => {
     voiceOn = !voiceOn;
+    try { localStorage.setItem("cf_asst_voice", voiceOn ? "1" : "0"); } catch {}
     voiceBtn.setAttribute("aria-pressed", voiceOn ? "true" : "false");
     voiceBtn.title = voiceOn ? "Sesli cevap açık" : "Sesli cevap kapalı";
     voiceBtn.classList.toggle("is-muted", !voiceOn);
@@ -1810,9 +2433,8 @@ function mountCepteAsistan(page) {
     send(input.value);
   });
   micBtn.addEventListener("click", () => {
-    // Dinlerken tekrar tık = bitir (startSpeechToText içinde)
     startSpeechToText(input, micBtn, (value) => {
-      if (value && value.trim()) send(value);
-    });
+      if (value && value.trim()) send(value, true);
+    }, pageListenHint(page));
   });
 }

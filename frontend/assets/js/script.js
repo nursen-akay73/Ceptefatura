@@ -9,6 +9,7 @@
 
   function splashMarkup() {
     return `
+      <div class="splash-wave" aria-hidden="true"></div>
       <div class="splash-inner">
         <div class="splash-logo-wrap">
           <img class="splash-icon" src="${iconSrc}" alt="">
@@ -38,8 +39,8 @@
     if (!el) return;
     setTimeout(() => {
       el.classList.add("is-done");
-      setTimeout(() => el.remove(), 450);
-    }, 1800);
+      setTimeout(() => el.remove(), 520);
+    }, 2800);
     try { sessionStorage.setItem("cf_splash", "1"); } catch {}
   }
 
@@ -82,20 +83,28 @@ document.addEventListener("DOMContentLoaded", () => {
     document.body.appendChild(overlay);
   }
 
-  fetch("../components/sidebar.html")
-    .then(r => r.text())
-    .then(html => {
-      const target = document.getElementById("sidebar-container");
-      if (target) {
-        target.innerHTML = html;
-        const active = target.querySelector(`[data-page="${page}"]`);
-        if (active) active.classList.add("active");
-        target.querySelectorAll("a").forEach((a) => {
-          a.addEventListener("click", () => document.body.classList.remove("nav-open"));
-        });
-        applyRoleNav(getSessionUser());
-      }
+  function bindSidebar(target) {
+    if (!target) return;
+    const active = target.querySelector(`[data-page="${page}"]`);
+    if (active) active.classList.add("active");
+    target.querySelectorAll("a").forEach((a) => {
+      a.addEventListener("click", () => document.body.classList.remove("nav-open"));
     });
+    applyRoleNav(getSessionUser());
+  }
+
+  const sidebarTarget = document.getElementById("sidebar-container");
+  if (sidebarTarget?.querySelector(".sidebar")) {
+    bindSidebar(sidebarTarget);
+  } else if (sidebarTarget) {
+    fetch("../components/sidebar.html")
+      .then((r) => (r.ok ? r.text() : Promise.reject()))
+      .then((html) => {
+        sidebarTarget.innerHTML = html;
+        bindSidebar(sidebarTarget);
+      })
+      .catch(() => {});
+  }
 
   fetch("../components/header.html")
     .then(r => r.text())
@@ -855,12 +864,16 @@ function initSettingsPage() {
     tab?.click();
   }
 
-  document.getElementById("form-account")?.addEventListener("submit", (e) => {
+  document.getElementById("form-account")?.addEventListener("submit", async (e) => {
     e.preventDefault();
     const ad = document.getElementById("set-ad-soyad")?.value.trim();
     const mail = document.getElementById("set-email")?.value.trim();
     const pass = document.getElementById("set-sifre")?.value;
     const pass2 = document.getElementById("set-sifre-tekrar")?.value;
+    if (!ad || !mail) {
+      showToast("Ad soyad ve e-posta zorunlu", "error");
+      return;
+    }
     if (pass || pass2) {
       if (pass.length < 6) {
         showToast("Şifre en az 6 karakter olmalı", "error");
@@ -871,12 +884,26 @@ function initSettingsPage() {
         return;
       }
     }
-    const current = getSessionUser() || {};
-    saveSessionUser({ ...current, ad_soyad: ad, email: mail });
-    paintUserMenu(getSessionUser());
-    showToast("Hesap bilgileri kaydedildi");
-    document.getElementById("set-sifre").value = "";
-    document.getElementById("set-sifre-tekrar").value = "";
+    const submitBtn = e.target.querySelector("button[type=submit]");
+    if (submitBtn) submitBtn.disabled = true;
+    try {
+      const body = { ad_soyad: ad, email: mail };
+      if (pass) body.sifre = pass;
+      const updated = await apiFetch("/api/auth/me", { method: "PATCH", body });
+      const current = getSessionUser() || {};
+      saveSessionUser({ ...current, ...updated });
+      paintUserMenu(getSessionUser());
+      fillSettingsUser(getSessionUser());
+      showToast("Hesap bilgileri kaydedildi");
+      const p1 = document.getElementById("set-sifre");
+      const p2 = document.getElementById("set-sifre-tekrar");
+      if (p1) p1.value = "";
+      if (p2) p2.value = "";
+    } catch (err) {
+      showToast(err.message || "Hesap kaydedilemedi", "error");
+    } finally {
+      if (submitBtn) submitBtn.disabled = false;
+    }
   });
 
   document.getElementById("form-notify")?.addEventListener("submit", (e) => {
@@ -924,13 +951,32 @@ function initSettingsPage() {
     }
   });
 
-  document.getElementById("btn-invite-accountant")?.addEventListener("click", () => {
+  document.getElementById("btn-invite-accountant")?.addEventListener("click", async () => {
     const mail = document.getElementById("set-invite-email")?.value.trim();
     if (!mail) {
       showToast("Müşavir e-postasını yazın", "error");
       return;
     }
-    showToast("Davet e-postası gönderildi");
+    const businessId = activeBusinessId();
+    if (!businessId) {
+      showToast("Aktif işletme bulunamadı", "error");
+      return;
+    }
+    const btn = document.getElementById("btn-invite-accountant");
+    if (btn) btn.disabled = true;
+    try {
+      const data = await apiFetch("/api/businesses/" + businessId + "/invite", {
+        method: "POST",
+        body: { email: mail },
+      });
+      showToast((data.ad_soyad || mail) + " müşavir olarak bağlandı");
+      const input = document.getElementById("set-invite-email");
+      if (input) input.value = "";
+    } catch (err) {
+      showToast(err.message || "Davet gönderilemedi", "error");
+    } finally {
+      if (btn) btn.disabled = false;
+    }
   });
 
   ["set-ad-soyad", "set-email", ...Object.keys(FIRMA_PROFIL_FIELDS)].forEach((id) => {
@@ -1102,8 +1148,12 @@ function bindIyzicoDemoUi(slot) {
     exp.value = digits.length > 2 ? digits.slice(0, 2) + "/" + digits.slice(2) : digits;
   });
   slot.querySelector("[data-iyzico-pay]")?.addEventListener("click", () => {
-    showToast("Demo iyzico ekranı — fatura ödenmedi. Canlı anahtar bağlanınca tahsilat burada alınır.");
-    closeIyzicoPayPanel();
+    slot.innerHTML = `
+      <div class="iyzico-soon">
+        <p>Çok yakında iyzico ve PayTR bağlanacak</p>
+        <button type="button" class="iyzico-demo-pay" data-iyzico-soon-ok>Tamam</button>
+      </div>`;
+    slot.querySelector("[data-iyzico-soon-ok]")?.addEventListener("click", closeIyzicoPayPanel);
   });
 }
 
@@ -2161,7 +2211,8 @@ function mountCepteAsistan(page) {
   root.innerHTML = `
     <div class="cf-asst-panel" hidden>
       <div class="cf-asst-head">
-        <img src="../assets/img/asst-icon.png" alt="" width="28" height="28">
+        <img class="cf-asst-head-icon is-light" src="../assets/img/asst-icon-light.png" alt="" width="28" height="28">
+        <img class="cf-asst-head-icon is-dark" src="../assets/img/asst-icon.png" alt="" width="28" height="28">
         <div>
           <strong>Cepte Asistan</strong>
           <span>${escapeHtml(meta.title)}</span>
@@ -2183,7 +2234,8 @@ function mountCepteAsistan(page) {
       </form>
     </div>
     <button type="button" class="cf-asst-fab" data-asst-toggle aria-label="Cepte Asistan">
-      <img src="../assets/img/asst-icon.png" alt="" width="68" height="68">
+      <img class="cf-asst-fab-icon is-light" src="../assets/img/asst-icon-light.png" alt="" width="68" height="68">
+      <img class="cf-asst-fab-icon is-dark" src="../assets/img/asst-icon.png" alt="" width="68" height="68">
     </button>`;
   const backdrop = document.createElement("button");
   backdrop.type = "button";

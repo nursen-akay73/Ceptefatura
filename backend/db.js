@@ -11,6 +11,10 @@ const pool = new Pool({
   ssl: hasDatabaseUrl ? { rejectUnauthorized: false } : false,
 });
 
+pool.on("error", (err) => {
+  console.warn("PostgreSQL bağlantısı koptu, yeniden denenecek:", err.message);
+});
+
 async function checkDbConnection() {
   if (!hasDatabaseUrl) {
     return {

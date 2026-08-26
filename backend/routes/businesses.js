@@ -102,6 +102,67 @@ router.post("/requests/:requestId/reject", async (req, res) => {
   }
 });
 
+router.post("/:id/invite", async (req, res) => {
+  const email = String((req.body && req.body.email) || "").trim().toLowerCase();
+  if (!email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+    return res.status(400).json({ error: "Geçerli bir e-posta yazın" });
+  }
+
+  try {
+    const own = await pool.query(
+      `SELECT 1 FROM user_businesses
+       WHERE user_id = $1 AND business_id = $2 AND status = 'onaylandi' AND role = 'sahip'`,
+      [req.userId, req.params.id]
+    );
+    if (!own.rows[0]) {
+      return res.status(403).json({ error: "Sadece işletme sahibi müşavir davet edebilir" });
+    }
+
+    const { rows: users } = await pool.query(
+      `SELECT id, email, ad_soyad FROM users WHERE lower(email) = $1`,
+      [email]
+    );
+    const invited = users[0];
+    if (!invited) {
+      return res.status(404).json({
+        error: "Bu e-posta ile kayıtlı kullanıcı yok. Müşavirinizin önce CepteFatura’ya kayıt olması gerekir.",
+      });
+    }
+    if (invited.id === req.userId) {
+      return res.status(400).json({ error: "Kendinizi müşavir olarak davet edemezsiniz" });
+    }
+
+    const { rows: existing } = await pool.query(
+      `SELECT role, status FROM user_businesses WHERE user_id = $1 AND business_id = $2`,
+      [invited.id, req.params.id]
+    );
+    if (existing[0]) {
+      if (existing[0].role === "sahip") {
+        return res.status(409).json({ error: "Bu kullanıcı zaten işletme sahibi" });
+      }
+      if (existing[0].status === "onaylandi") {
+        return res.status(409).json({ error: "Bu müşavir zaten işletmenize bağlı" });
+      }
+      await pool.query(
+        `UPDATE user_businesses SET status = 'onaylandi', role = 'musavir'
+         WHERE user_id = $1 AND business_id = $2`,
+        [invited.id, req.params.id]
+      );
+      return res.json({ ok: true, ad_soyad: invited.ad_soyad, email: invited.email });
+    }
+
+    await pool.query(
+      `INSERT INTO user_businesses (user_id, business_id, role, status)
+       VALUES ($1, $2, 'musavir', 'onaylandi')`,
+      [invited.id, req.params.id]
+    );
+    res.status(201).json({ ok: true, ad_soyad: invited.ad_soyad, email: invited.email });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: "Davet gönderilemedi" });
+  }
+});
+
 router.post("/", async (req, res) => {
   const { isletme_adi, vergi_no, vergi_dairesi } = req.body || {};
   if (!isletme_adi) {

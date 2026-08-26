@@ -5,7 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Gelen Faturalar | Akıllı Muhasebe</title>
     <script src="../assets/js/dark-mode.js"></script>
-    <link rel="stylesheet" href="../assets/css/style.css">
+    <link rel="stylesheet" href="../assets/css/style.css?v=paysoon">
     <link rel="icon" href="../assets/img/logo-icon.png">
     <style>
 
@@ -64,6 +64,17 @@
             font-size: 24px;
             cursor: pointer;
             color: var(--muted);
+        }
+
+        .modal-actions {
+            display: flex;
+            flex-wrap: wrap;
+            justify-content: flex-end;
+            align-items: center;
+            gap: 8px;
+            margin-top: 20px;
+            padding-top: 14px;
+            border-top: 1px solid #f1f5f9;
         }
 
         .invoice-preview-table {
@@ -194,15 +205,15 @@
                     </div>
                 </div>
             </div>
-            <div style="display:flex; justify-content:flex-end; gap:10px; margin-top:20px; border-top:1px solid #f1f5f9; padding-top:12px;">
+            <div class="modal-actions">
                 <button class="btn btn-secondary" id="closeModalBtn">Kapat</button>
-                <button class="btn btn-primary" type="button" id="btn-pay-invoice" hidden>Ödeme Yap →</button>
-                <button class="btn btn-primary" type="button" id="btn-pdf-invoice">PDF İndir</button>
+                <button class="btn btn-secondary" type="button" id="btn-pdf-invoice">PDF İndir</button>
+                <button class="btn btn-primary" type="button" id="btn-pay-invoice" hidden>Ödeme Yap</button>
             </div>
         </div>
     </div>
 
-    <script src="../assets/js/script.js"></script>
+    <script src="../assets/js/script.js?v=paysoon"></script>
     <script>
         document.addEventListener('DOMContentLoaded', function () {
 

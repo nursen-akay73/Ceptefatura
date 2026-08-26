@@ -176,4 +176,43 @@ router.get("/me", requireAuth, async (req, res) => {
   }
 });
 
+router.patch("/me", requireAuth, async (req, res) => {
+  const { ad_soyad, email, sifre } = req.body || {};
+  const name = String(ad_soyad || "").trim();
+  const mail = String(email || "").trim().toLowerCase();
+  if (!name || !mail) {
+    return res.status(400).json({ error: "ad soyad ve e-posta zorunlu" });
+  }
+  if (sifre && String(sifre).length < 6) {
+    return res.status(400).json({ error: "şifre en az 6 karakter olmalı" });
+  }
+
+  try {
+    if (sifre) {
+      const hash = await bcrypt.hash(String(sifre), 10);
+      await pool.query(
+        `UPDATE users SET ad_soyad = $1, email = $2, sifre_hash = $3 WHERE id = $4`,
+        [name, mail, hash, req.userId]
+      );
+    } else {
+      await pool.query(
+        `UPDATE users SET ad_soyad = $1, email = $2 WHERE id = $3`,
+        [name, mail, req.userId]
+      );
+    }
+    const { rows } = await pool.query(
+      `SELECT id, ad_soyad, isletme_adi, email, created_at FROM users WHERE id = $1`,
+      [req.userId]
+    );
+    if (!rows[0]) return res.status(404).json({ error: "kullanıcı bulunamadı" });
+    res.json(rows[0]);
+  } catch (err) {
+    if (err.code === "23505") {
+      return res.status(409).json({ error: "bu e-posta zaten kayıtlı" });
+    }
+    console.error(err);
+    res.status(500).json({ error: "hesap güncellenemedi" });
+  }
+});
+
 module.exports = router;

@@ -5,7 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Giden Faturalar | Akıllı Muhasebe</title>
     <script src="../assets/js/dark-mode.js"></script>
-    <link rel="stylesheet" href="../assets/css/style.css">
+    <link rel="stylesheet" href="../assets/css/style.css?v=asst3">
     <link rel="icon" href="../assets/img/logo-icon.png">
     <style>
 
@@ -64,6 +64,25 @@
             font-size: 24px;
             cursor: pointer;
             color: var(--muted);
+        }
+
+        .modal-actions {
+            display: flex;
+            flex-wrap: wrap;
+            justify-content: space-between;
+            align-items: center;
+            gap: 8px;
+            margin-top: 20px;
+            padding-top: 14px;
+            border-top: 1px solid #f1f5f9;
+        }
+
+        .modal-actions-end {
+            display: flex;
+            flex-wrap: wrap;
+            justify-content: flex-end;
+            gap: 8px;
+            margin-left: auto;
         }
 
         .invoice-preview-table {
@@ -198,18 +217,18 @@
                     </div>
                 </div>
             </div>
-            <div style="display:flex; justify-content:space-between; align-items:center; gap:10px; margin-top:20px; border-top:1px solid #f1f5f9; padding-top:12px;">
+            <div class="modal-actions">
                 <button class="btn btn-danger" type="button" id="btn-delete-invoice">Sil</button>
-                <div style="display:flex; gap:10px;">
+                <div class="modal-actions-end">
                     <button class="btn btn-secondary" id="closeModalBtn">Kapat</button>
-                    <button class="btn btn-primary" type="button" id="btn-pay-invoice" hidden>Ödeme Al →</button>
-                    <button class="btn btn-primary" type="button" id="btn-pdf-invoice">PDF İndir</button>
+                    <button class="btn btn-secondary" type="button" id="btn-pdf-invoice">PDF İndir</button>
+                    <button class="btn btn-primary" type="button" id="btn-pay-invoice" hidden>Ödeme Al</button>
                 </div>
             </div>
         </div>
     </div>
 
-    <script src="../assets/js/script.js"></script>
+    <script src="../assets/js/script.js?v=asst2"></script>
     <script>
         document.addEventListener('DOMContentLoaded', function () {
 
@@ -349,7 +368,6 @@
                     document.getElementById('m-toplam').innerText = money(inv.tutar);
 
                     const beklemede = inv.durum === 'Bekliyor' || inv.durum === 'Gecikti';
-                    closeModalBtn.hidden = beklemede;
                     payBtn.hidden = !beklemede;
 
                     const kalemlerBody = document.getElementById('m-kalemler');

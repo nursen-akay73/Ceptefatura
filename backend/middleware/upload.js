@@ -14,9 +14,11 @@ const storage = multer.diskStorage({
 
 const upload = multer({
   storage,
-  limits: { fileSize: 5 * 1024 * 1024 },
+  limits: { fileSize: 12 * 1024 * 1024 },
   fileFilter: (_req, file, cb) => {
-    if (ALLOWED.has(file.mimetype)) return cb(null, true);
+    const ext = path.extname(file.originalname || "").toLowerCase();
+    const okExt = [".jpg", ".jpeg", ".png", ".webp", ".pdf"].includes(ext);
+    if (ALLOWED.has(file.mimetype) || okExt) return cb(null, true);
     cb(new Error("Sadece JPG, PNG, WEBP veya PDF yüklenebilir"));
   },
 });

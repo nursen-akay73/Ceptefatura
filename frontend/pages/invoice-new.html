@@ -55,9 +55,11 @@
                         <select id="select-cari"></select>
                         <small id="ocr-cari-hint" class="field-hint" hidden></small>
                     </div>
-                    <div class="form-group" id="branch-field" hidden>
+                    <div class="form-group" id="branch-field">
                         <label>Şube</label>
-                        <select id="select-branch"></select>
+                        <select id="select-branch">
+                            <option value="">Şube seçin</option>
+                        </select>
                     </div>
                     <div class="form-group">
                         <label>Fatura Türü</label>
@@ -160,7 +162,6 @@
             const selectedCariFromUrl = urlParams.get('cari');
             const selectCari = document.getElementById('select-cari');
             const selectBranch = document.getElementById('select-branch');
-            const branchField = document.getElementById('branch-field');
             const kesimInput = document.getElementById('kesim-tarihi');
             const vadeInput = document.getElementById('vade-tarihi');
 
@@ -189,16 +190,15 @@
                 showToast(err.message || 'Cariler alınamadı', 'error');
             }
 
+            let loadedBranches = [];
             try {
                 const businessId = activeBusinessId();
                 if (businessId) {
-                    const branches = await apiFetch('/api/businesses/' + businessId + '/branches');
-                    if (branches.length > 1) {
-                        selectBranch.innerHTML = branches
-                            .map((b) => `<option value="${b.id}">${escapeHtml(b.sube_adi)}</option>`)
-                            .join('');
-                        branchField.hidden = false;
-                    }
+                    loadedBranches = await apiFetch('/api/businesses/' + businessId + '/branches') || [];
+                    selectBranch.innerHTML = '<option value="">Şube seçin</option>' + loadedBranches
+                        .map((b) => `<option value="${b.id}">${escapeHtml(b.sube_adi)}</option>`)
+                        .join('');
+                    if (loadedBranches.length === 1) selectBranch.value = loadedBranches[0].id;
                 }
             } catch {}
 
@@ -325,14 +325,24 @@
                         }
                     }
                 }
-                if (data.tarih) {
-                    const todayYmd = ymdLocal(new Date());
-                    if (data.tarih >= todayYmd) kesimInput.value = data.tarih;
+                if (data.fatura_turu) {
+                    const tur = document.getElementById('select-fatura-turu');
+                    if (tur && [...tur.options].some((o) => o.value === data.fatura_turu)) {
+                        tur.value = data.fatura_turu;
+                    }
                 }
-                if (data.vade_tarihi) {
-                    const todayYmd = ymdLocal(new Date());
-                    if (data.vade_tarihi >= todayYmd) vadeInput.value = data.vade_tarihi;
+
+                if (data.sube_adi && loadedBranches.length) {
+                    const target = String(data.sube_adi).toLowerCase().trim();
+                    const match = loadedBranches.find((b) => {
+                        const name = String(b.sube_adi || "").toLowerCase();
+                        return name === target || (name.length >= 3 && (name.includes(target) || target.includes(name)));
+                    });
+                    if (match) selectBranch.value = match.id;
                 }
+
+                if (data.tarih) kesimInput.value = data.tarih;
+                if (data.vade_tarihi) vadeInput.value = data.vade_tarihi;
                 if (data.fatura_notu && !/fatura\s*tarih|senaryo|fatura\s*tip|bilgi/i.test(data.fatura_notu)) {
                     const note = document.getElementById('fatura_notu');
                     if (note && !note.value) note.value = data.fatura_notu;
@@ -353,7 +363,7 @@
             async function handleScanFile(file) {
                 if (!file) return;
                 const okType = /^(image\/(jpeg|png|webp)|application\/pdf)$/i.test(file.type)
-                    || /\.pdf$/i.test(file.name || '');
+                    || /\.(pdf|jpe?g|png|webp)$/i.test(file.name || '');
                 if (!okType) {
                     showToast('JPG, PNG, WEBP veya PDF yükleyin', 'error');
                     return;
@@ -441,7 +451,7 @@
                         method: 'POST',
                         body: {
                             account_id: selectCari.value,
-                            branch_id: branchField.hidden ? null : selectBranch.value,
+                            branch_id: selectBranch.value || null,
                             fatura_turu: document.getElementById('select-fatura-turu').value,
                             kesim_tarihi: kesimInput.value,
                             vade_tarihi: vadeInput.value,

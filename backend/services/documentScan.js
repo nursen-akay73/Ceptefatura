@@ -3,6 +3,8 @@
 // Bulut AI yok; sonuç her zaman forma doldurulur, kullanıcı kontrol eder.
 
 const Tesseract = require("tesseract.js");
+const os = require("os");
+const path = require("path");
 
 let sharp = null;
 try {
@@ -70,6 +72,60 @@ async function extractPdfText(buffer) {
   }
 }
 
+async function extractPdfEmbeddedImage(buffer) {
+  let pdfjs;
+  try {
+    pdfjs = require("pdfjs-dist/legacy/build/pdf.js");
+  } catch {
+    return null;
+  }
+  if (!sharp) return null;
+  try {
+    const loadingTask = pdfjs.getDocument({
+      data: new Uint8Array(buffer),
+      disableWorker: true,
+      isEvalSupported: false,
+      useSystemFonts: true,
+    });
+    const pdf = await loadingTask.promise;
+    const page = await pdf.getPage(1);
+    const ops = await page.getOperatorList();
+    const paintOps = new Set([
+      pdfjs.OPS.paintImageXObject,
+      pdfjs.OPS.paintInlineImageXObject,
+      pdfjs.OPS.paintJpegXObject,
+    ].filter(Boolean));
+    for (let i = 0; i < ops.fnArray.length; i++) {
+      if (!paintOps.has(ops.fnArray[i])) continue;
+      const name = ops.argsArray[i] && ops.argsArray[i][0];
+      if (!name) continue;
+      let img = null;
+      try {
+        img = await page.objs.get(name);
+      } catch {
+        try {
+          img = await page.commonObjs.get(name);
+        } catch {
+          img = null;
+        }
+      }
+      if (!img || !img.data || !img.width || !img.height) continue;
+      const raw = Buffer.from(img.data);
+      const pixels = img.width * img.height;
+      const channels = raw.length >= pixels * 4 ? 4 : raw.length >= pixels * 3 ? 3 : 0;
+      if (!channels) continue;
+      return await sharp(raw, {
+        raw: { width: img.width, height: img.height, channels },
+      })
+        .jpeg({ quality: 85 })
+        .toBuffer();
+    }
+  } catch {
+    return null;
+  }
+  return null;
+}
+
 async function preprocessImage(buffer) {
   if (!sharp) return buffer;
   try {
@@ -89,7 +145,11 @@ let ocrQueue = Promise.resolve();
 
 async function getOcrWorker() {
   if (!ocrWorkerPromise) {
-    ocrWorkerPromise = Tesseract.createWorker("tur+eng", 1, { logger: () => {} }).then(async (worker) => {
+    const cachePath = path.join(os.tmpdir(), "cf-tess-cache");
+    ocrWorkerPromise = Tesseract.createWorker("tur+eng", 1, {
+      logger: () => {},
+      cachePath,
+    }).then(async (worker) => {
       await worker.setParameters({ tessedit_pageseg_mode: "6" });
       return worker;
     });
@@ -212,6 +272,31 @@ function extractLabeledDate(lines, labelPatterns) {
   const val = extractLabeledValue(lines, labelPatterns);
   if (!val) return null;
   return extractDate(val) || extractDate(String(val).replace(/[^\d./-]+/g, " "));
+}
+
+function extractFaturaTuru(text) {
+  const t = String(text || "");
+  if (/e-?\s*ar[sş]iv/i.test(t)) return "E-Arşiv";
+  if (/e-?\s*fatura/i.test(t)) return "E-Fatura";
+  return null;
+}
+
+function extractSube(lines) {
+  const value = extractLabeledValue(lines, [
+    "[ŞS]ube\\s*Ad[ıi]",
+    "Branch\\s*Name",
+    "İşyeri\\s*Ad[ıi]",
+    "[ŞS]ube",
+    "Branch",
+    "İşyeri",
+  ]);
+  if (!value) return null;
+  const cleaned = String(value)
+    .replace(/[^\p{L}\d\s.&'/-]/gu, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+  if (cleaned.length < 2 || isNoiseName(cleaned)) return null;
+  return cleaned.slice(0, 80);
 }
 
 function extractCariAdi(lines) {
@@ -402,7 +487,22 @@ async function extractInvoiceFromDocument(fileBuffer, mimetype, originalname = "
   const isPdf = mimetype === PDF_TYPE || /\.pdf$/i.test(originalname || "");
 
   if (isPdf) {
-    text = await extractPdfText(fileBuffer);
+    try {
+      text = await extractPdfText(fileBuffer);
+    } catch (err) {
+      if (err.status === 500) throw err;
+      text = "";
+    }
+    if (!text || text.trim().length < 8) {
+      const embedded = await extractPdfEmbeddedImage(fileBuffer);
+      if (embedded) {
+        try {
+          text = await runOcr(await preprocessImage(embedded));
+        } catch {
+          text = "";
+        }
+      }
+    }
     if (!text || text.trim().length < 8) {
       const err = new Error(
         "Bu PDF’den metin okunamadı (taranmış görüntü olabilir). Sayfayı JPG/PNG kaydedip yükleyin."
@@ -410,7 +510,7 @@ async function extractInvoiceFromDocument(fileBuffer, mimetype, originalname = "
       err.status = 422;
       throw err;
     }
-  } else if (ALLOWED_OCR_TYPES.has(mimetype)) {
+  } else if (ALLOWED_OCR_TYPES.has(mimetype) || /\.(jpe?g|png|webp)$/i.test(originalname || "")) {
     let processed;
     try {
       processed = await preprocessImage(fileBuffer);
@@ -442,6 +542,8 @@ async function extractInvoiceFromDocument(fileBuffer, mimetype, originalname = "
     .filter(Boolean);
 
   const cari_adi = extractCariAdi(lines) || extractVendorName(lines);
+  const sube_adi = extractSube(lines);
+  const fatura_turu = extractFaturaTuru(text);
   const tarih =
     extractLabeledDate(lines, [
       "Fatura\\s*Tarihi",
@@ -466,6 +568,8 @@ async function extractInvoiceFromDocument(fileBuffer, mimetype, originalname = "
 
   return {
     cari_adi,
+    sube_adi,
+    fatura_turu,
     tarih,
     vade_tarihi,
     fatura_no,

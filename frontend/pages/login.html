@@ -28,6 +28,14 @@
       @keyframes cfCard { 0%{opacity:0;transform:translateY(18px) scale(.92)} 100%{opacity:1;transform:none} }
       @keyframes cfShimmer { 0%{background-position:100% 0} 100%{background-position:-100% 0} }
       @keyframes cfCheck { 0%{opacity:0;transform:scale(.3)} 100%{opacity:1;transform:scale(1)} }
+      @media (max-width: 768px) {
+        .splash-inner { width: min(360px, 86vw); }
+      }
+      @media (max-width: 480px) {
+        .splash-icon { height: 56px; }
+        .splash-word { height: 24px; }
+        .splash-logo-wrap::before { width: 80px; height: 80px; }
+      }
     </style>
 </head>
 <body class="auth-page auth-split">

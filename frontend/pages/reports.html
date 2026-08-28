@@ -35,6 +35,21 @@
                     font-weight: 500;
                     white-space: nowrap;
                 }
+
+        @media (max-width: 768px) {
+            .chart-container {
+                overflow-x: auto;
+                -webkit-overflow-scrolling: touch;
+                gap: 8px;
+            }
+        }
+
+        @media (max-width: 480px) {
+            .chart-container {
+                height: 160px;
+                gap: 6px;
+            }
+        }
     </style>
 </head>
 <body data-page="reports">

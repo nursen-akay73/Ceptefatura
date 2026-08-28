@@ -4226,3 +4226,198 @@ body.about-page::before {
     border-color: var(--border);
 }
 
+/* --- MOBİL (768 / 480) — mevcut masaüstü kurallarının üzerine biner --- */
+@media (max-width: 768px) {
+    #sidebar-container {
+        width: 0;
+        min-width: 0;
+        height: 0;
+        overflow: hidden;
+    }
+
+    .main,
+    .content {
+        min-width: 0;
+    }
+
+    .content {
+        padding: 20px 12px 80px;
+    }
+
+    .stats,
+    .two-col,
+    .three-col,
+    .form-grid,
+    .plan-grid,
+    .about-grid,
+    .quick-actions,
+    .auth-shell {
+        grid-template-columns: 1fr;
+    }
+
+    .page-heading {
+        flex-direction: column;
+        align-items: stretch;
+    }
+
+    .page-heading > div:last-child {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 8px;
+        width: 100%;
+    }
+
+    .page-heading .btn {
+        width: 100%;
+        min-height: 44px;
+        justify-content: center;
+    }
+
+    input:not([type="checkbox"]):not([type="radio"]):not([type="hidden"]),
+    select,
+    textarea,
+    .btn {
+        min-height: 44px;
+    }
+
+    .form-actions {
+        flex-direction: column;
+        align-items: stretch;
+    }
+
+    .form-actions .btn {
+        width: 100%;
+        justify-content: center;
+    }
+
+    .filter-row {
+        flex-wrap: wrap;
+        overflow: visible;
+    }
+
+    .filter-row input,
+    .filter-row select {
+        min-width: 0;
+        width: 100%;
+        min-height: 44px;
+        flex: 1 1 100%;
+        border-right: 0;
+        border-bottom: 1px solid var(--border);
+    }
+
+    .table-wrap {
+        overflow-x: auto;
+        -webkit-overflow-scrolling: touch;
+    }
+
+    .topbar {
+        padding: 0 12px;
+    }
+
+    .modal-overlay.drawer .modal-card {
+        width: 100%;
+        max-width: 100%;
+        border-radius: 0;
+    }
+
+    .about-top {
+        flex-wrap: wrap;
+        padding: 14px 16px;
+    }
+
+    .about-card {
+        padding: 24px 16px;
+    }
+
+    .iyzico-pay-card,
+    .cf-asst-panel {
+        max-width: 100%;
+    }
+
+    .cashflow {
+        overflow-x: auto;
+        -webkit-overflow-scrolling: touch;
+    }
+}
+
+@media (max-width: 480px) {
+    html,
+    body {
+        font-size: 13px;
+    }
+
+    .page-heading h1 {
+        font-size: 22px;
+    }
+
+    .stat-card .value {
+        font-size: 16px;
+    }
+
+    .content {
+        padding: 16px 10px 80px;
+    }
+
+    .card {
+        padding: 16px;
+    }
+
+    .about-marquee-row {
+        font-size: 14px;
+        gap: 28px;
+    }
+
+    .iyzico-pay-overlay {
+        padding: 8px;
+    }
+}
+
+/* Tablet/telefon: menü kapalı kalsın, yalnızca ☰ ile açılsın */
+@media (max-width: 1024px) {
+    #sidebar-container {
+        position: static !important;
+        width: 0 !important;
+        min-width: 0 !important;
+        height: 0 !important;
+        flex: 0 0 0 !important;
+        overflow: hidden !important;
+        pointer-events: none;
+    }
+
+    .main {
+        width: 100%;
+        flex: 1 1 100%;
+        min-width: 0;
+    }
+
+    body:not(.nav-open) .sidebar {
+        display: none !important;
+    }
+
+    .topbar {
+        z-index: 90;
+    }
+
+    .sidebar-overlay {
+        z-index: 70;
+    }
+
+    body.nav-open #sidebar-container {
+        overflow: visible !important;
+        pointer-events: auto;
+    }
+
+    body.nav-open .sidebar {
+        display: flex !important;
+        position: fixed !important;
+        top: 0 !important;
+        left: 0 !important;
+        height: 100dvh !important;
+        width: min(var(--sidebar-width), 86vw) !important;
+        z-index: 80 !important;
+        transform: none !important;
+        visibility: visible !important;
+        pointer-events: auto !important;
+    }
+}
+

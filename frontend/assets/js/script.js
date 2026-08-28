@@ -74,6 +74,7 @@
 })();
 
 document.addEventListener("DOMContentLoaded", () => {
+  document.body.classList.remove("nav-open");
   const page = document.body.dataset.page;
 
   if (!document.querySelector(".sidebar-overlay")) {

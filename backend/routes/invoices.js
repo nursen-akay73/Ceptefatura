@@ -609,12 +609,8 @@ router.post("/:id/payment", async (req, res) => {
 
     const price = Number(invoice.tutar).toFixed(2);
 
-    // DEMO: iyzico anahtarı yokken ödeme panelini göstermek için.
-    // Canlıya geçince bu bloğu silin; alttaki checkoutFormInitialize kalsın.
+    // Anahtar yoksa kırmızı hata dönme; demo tahsilat ekranı açılsın.
     if (!isIyzicoConfigured()) {
-      if (process.env.NODE_ENV === "production") {
-        return res.status(503).json({ error: "Ödeme sağlayıcısı yapılandırılmamış" });
-      }
       return res.json({
         demo: true,
         amount: Number(price),

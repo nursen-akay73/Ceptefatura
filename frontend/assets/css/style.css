@@ -4078,6 +4078,18 @@ body.about-page::before {
     color: #0f172a;
 }
 
+.iyzico-demo-badge {
+    font-size: 11px;
+    font-weight: 700;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+    color: #1d4ed8;
+    background: #eff6ff;
+    border: 1px solid #bfdbfe;
+    border-radius: 999px;
+    padding: 3px 8px;
+}
+
 .iyzico-pay-head .modal-close {
     background: none;
     border: none;
@@ -4188,6 +4200,84 @@ body.about-page::before {
     color: #64748b;
 }
 
+.pay-providers {
+    margin: 0 0 18px;
+}
+
+.pay-providers-label {
+    margin: 0 0 8px;
+    font-size: 12px;
+    font-weight: 600;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+    color: #64748b;
+}
+
+.pay-provider-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 10px;
+}
+
+.pay-provider-card {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 4px;
+    padding: 12px 12px 10px;
+    border: 1.5px solid #e2e8f0;
+    border-radius: 12px;
+    background: #fff;
+    cursor: pointer;
+    text-align: left;
+    font: inherit;
+    color: inherit;
+    transition: border-color 0.15s ease, box-shadow 0.15s ease;
+}
+
+.pay-provider-card small {
+    color: #64748b;
+    font-size: 11px;
+}
+
+.pay-provider-card.is-active {
+    border-color: #2563eb;
+    box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.12);
+}
+
+.pay-provider-card[data-pay-provider="paytr"].is-active {
+    border-color: #f97316;
+    box-shadow: 0 0 0 3px rgba(249, 115, 22, 0.14);
+}
+
+.pay-brand-iyzico {
+    font-size: 18px;
+    font-weight: 800;
+    letter-spacing: -0.03em;
+    color: #1a5cff;
+    line-height: 1.1;
+}
+
+.pay-brand-paytr {
+    font-size: 18px;
+    font-weight: 800;
+    letter-spacing: -0.03em;
+    color: #0f172a;
+    line-height: 1.1;
+}
+
+.pay-brand-paytr span {
+    color: #f97316;
+}
+
+.iyzico-demo-pay.paytr {
+    background: #ea580c;
+}
+
+.iyzico-demo-pay.paytr:hover {
+    background: #c2410c;
+}
+
 .iyzico-soon {
     padding: 48px 24px 28px;
     text-align: center;
@@ -4224,6 +4314,16 @@ body.about-page::before {
 
 [data-theme="dark"] .iyzico-demo input {
     border-color: var(--border);
+}
+
+[data-theme="dark"] .pay-provider-card {
+    background: #121826;
+    border-color: var(--border);
+    color: var(--text);
+}
+
+[data-theme="dark"] .pay-brand-paytr {
+    color: #e8f4fc;
 }
 
 /* --- MOBİL (768 / 480) — mevcut masaüstü kurallarının üzerine biner --- */

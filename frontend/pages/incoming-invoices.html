@@ -5,7 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Gelen Faturalar | Akıllı Muhasebe</title>
     <script src="../assets/js/dark-mode.js"></script>
-    <link rel="stylesheet" href="../assets/css/style.css?v=paysoon">
+    <link rel="stylesheet" href="../assets/css/style.css?v=pay1">
     <link rel="icon" href="../assets/img/logo-icon.png">
     <style>
 
@@ -238,7 +238,7 @@
         </div>
     </div>
 
-    <script src="../assets/js/script.js?v=paysoon"></script>
+    <script src="../assets/js/script.js?v=pay2"></script>
     <script>
         document.addEventListener('DOMContentLoaded', function () {
 
@@ -369,15 +369,11 @@
                 if (!currentInvoiceId) return;
                 payBtn.disabled = true;
                 try {
-                    const result = await apiFetch('/api/invoices/' + currentInvoiceId + '/payment', { method: 'POST' });
-                    openIyzicoPayPanel({
-                        ...result,
+                    await startInvoicePayment(currentInvoiceId, {
                         fatura_no: document.getElementById('m-fatura-no').innerText,
                         cari_adi: document.getElementById('m-cari').innerText,
                         amountLabel: document.getElementById('m-toplam').innerText,
                     });
-                } catch (err) {
-                    showToast(err.message || 'Ödeme başlatılamadı', 'error');
                 } finally {
                     payBtn.disabled = false;
                 }

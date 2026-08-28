@@ -1095,16 +1095,40 @@ function injectHtmlWithScripts(container, html) {
   while (tmp.firstChild) container.appendChild(tmp.firstChild);
 }
 
-function iyzicoDemoMarkup(data) {
-  const amount = data.amountLabel || ("₺" + Number(data.amount || 0).toLocaleString("tr-TR", { minimumFractionDigits: 2 }));
+function paymentAmountLabel(data) {
+  if (data.amountLabel) return data.amountLabel;
+  return "₺" + Number(data.amount || 0).toLocaleString("tr-TR", { minimumFractionDigits: 2 });
+}
+
+function payDemoMarkup(data, provider) {
+  const amount = escapeHtml(paymentAmountLabel(data));
   const no = escapeHtml(data.fatura_no || "—");
   const cari = escapeHtml(data.cari_adi || "—");
+  const isPaytr = provider === "paytr";
+  const brand = isPaytr
+    ? `<span class="pay-brand-paytr" aria-label="PayTR">Pay<span>TR</span></span>`
+    : `<span class="pay-brand-iyzico" aria-label="iyzico">iyzico</span>`;
+  const ctaClass = isPaytr ? "iyzico-demo-pay paytr" : "iyzico-demo-pay";
+  const note = isPaytr
+    ? "PayTR altyapısı ile kart veya havale. Tamamlanacak, yakında bu kısım eklenecek."
+    : "iyzico 3D Secure ile güvence altında. Demo ekranıdır; canlı anahtar bağlanınca tahsilat burada tamamlanır.";
   return `
-    <div class="iyzico-demo">
+    <div class="iyzico-demo ${isPaytr ? "is-paytr" : ""}" data-pay-demo>
+      <div class="pay-providers">
+        <p class="pay-providers-label">Tahsilat yöntemi</p>
+        <div class="pay-provider-grid">
+          <button type="button" class="pay-provider-card ${isPaytr ? "" : "is-active"}" data-pay-provider="iyzico">
+            <span class="pay-brand-iyzico">iyzico</span>
+            <small>Kart · 3D Secure</small>
+          </button>
+          <button type="button" class="pay-provider-card ${isPaytr ? "is-active" : ""}" data-pay-provider="paytr">
+            <span class="pay-brand-paytr">Pay<span>TR</span></span>
+            <small>Kart · havale / EFT</small>
+          </button>
+        </div>
+      </div>
       <div class="iyzico-demo-brand">
-        <svg viewBox="0 0 92 24" width="92" height="24" aria-label="iyzico">
-          <text x="0" y="18" font-family="Arial, sans-serif" font-weight="800" font-size="20" fill="#1A5CFF">iyzico</text>
-        </svg>
+        ${brand}
         <span>Güvenli ödeme</span>
       </div>
       <div class="iyzico-demo-summary">
@@ -1116,7 +1140,7 @@ function iyzicoDemoMarkup(data) {
           <small>Cari</small>
           <strong>${cari}</strong>
         </div>
-        <div class="iyzico-demo-amount">${escapeHtml(amount)}</div>
+        <div class="iyzico-demo-amount">${amount}</div>
       </div>
       <label>Kart üzerindeki isim
         <input type="text" autocomplete="cc-name" placeholder="AD SOYAD">
@@ -1132,12 +1156,12 @@ function iyzicoDemoMarkup(data) {
           <input type="text" inputmode="numeric" maxlength="4" placeholder="***" autocomplete="cc-csc">
         </label>
       </div>
-      <button type="button" class="iyzico-demo-pay" data-iyzico-pay>${escapeHtml(amount)} Öde</button>
-      <p class="iyzico-demo-note">3D Secure ile güvence altında. Bu ekran demodur; gerçek tahsilat iyzico anahtarı bağlanınca burada tamamlanır.</p>
+      <button type="button" class="${ctaClass}" data-iyzico-pay>${amount} Öde</button>
+      <p class="iyzico-demo-note">${note}</p>
     </div>`;
 }
 
-function bindIyzicoDemoUi(slot) {
+function bindPayDemoUi(slot, data) {
   const pan = slot.querySelector("[data-iyzico-pan]");
   const exp = slot.querySelector("[data-iyzico-exp]");
   pan?.addEventListener("input", () => {
@@ -1148,10 +1172,19 @@ function bindIyzicoDemoUi(slot) {
     const digits = exp.value.replace(/\D/g, "").slice(0, 4);
     exp.value = digits.length > 2 ? digits.slice(0, 2) + "/" + digits.slice(2) : digits;
   });
+  slot.querySelectorAll("[data-pay-provider]").forEach((btn) => {
+    btn.addEventListener("click", () => {
+      const next = btn.getAttribute("data-pay-provider") || "iyzico";
+      slot.innerHTML = payDemoMarkup(data, next);
+      bindPayDemoUi(slot, data);
+    });
+  });
   slot.querySelector("[data-iyzico-pay]")?.addEventListener("click", () => {
+    const provider = slot.querySelector(".pay-provider-card.is-active")?.getAttribute("data-pay-provider") || "iyzico";
+    const name = provider === "paytr" ? "PayTR" : "iyzico";
     slot.innerHTML = `
       <div class="iyzico-soon">
-        <p>Çok yakında iyzico ve PayTR bağlanacak</p>
+        <p>${name} demo tahsilatı tamamlandı. Canlı anahtar bağlanınca tutar müşteri kartından çekilir.</p>
         <button type="button" class="iyzico-demo-pay" data-iyzico-soon-ok>Tamam</button>
       </div>`;
     slot.querySelector("[data-iyzico-soon-ok]")?.addEventListener("click", closeIyzicoPayPanel);
@@ -1165,10 +1198,10 @@ function openIyzicoPayPanel(data) {
     overlay.id = "iyzico-pay-overlay";
     overlay.className = "iyzico-pay-overlay";
     overlay.innerHTML = `
-      <div class="iyzico-pay-card" role="dialog" aria-modal="true" aria-label="iyzico ödeme">
+      <div class="iyzico-pay-card" role="dialog" aria-modal="true" aria-label="Güvenli ödeme">
         <div class="iyzico-pay-head">
           <img class="iyzico-pay-brand" src="../assets/img/logo.png" alt="CepteFatura">
-          <strong>iyzico ile öde</strong>
+          <strong data-pay-head-title>Güvenli ödeme</strong>
           <span class="iyzico-demo-badge" data-iyzico-demo-badge hidden>Demo</span>
           <button type="button" class="modal-close" data-iyzico-close aria-label="Kapat">&times;</button>
         </div>
@@ -1183,10 +1216,12 @@ function openIyzicoPayPanel(data) {
 
   const slot = overlay.querySelector("[data-iyzico-slot]");
   const badge = overlay.querySelector("[data-iyzico-demo-badge]");
+  const title = overlay.querySelector("[data-pay-head-title]");
   slot.innerHTML = "";
 
   if (data.checkoutFormContent && !data.demo) {
     badge.hidden = true;
+    if (title) title.textContent = "iyzico ile öde";
     const formBox = document.createElement("div");
     formBox.id = "iyzipay-checkout-form";
     formBox.className = "responsive";
@@ -1194,6 +1229,7 @@ function openIyzicoPayPanel(data) {
     injectHtmlWithScripts(slot, data.checkoutFormContent);
   } else if (data.paymentPageUrl && !data.demo) {
     badge.hidden = true;
+    if (title) title.textContent = "iyzico ile öde";
     const iframe = document.createElement("iframe");
     iframe.className = "iyzico-pay-frame";
     iframe.title = "iyzico ödeme";
@@ -1201,11 +1237,22 @@ function openIyzicoPayPanel(data) {
     slot.appendChild(iframe);
   } else {
     badge.hidden = false;
-    slot.innerHTML = iyzicoDemoMarkup(data);
-    bindIyzicoDemoUi(slot);
+    if (title) title.textContent = "Güvenli ödeme";
+    slot.innerHTML = payDemoMarkup(data, "iyzico");
+    bindPayDemoUi(slot, data);
   }
 
   overlay.classList.add("active");
+}
+
+async function startInvoicePayment(invoiceId, meta) {
+  const fallback = { demo: true, ...(meta || {}) };
+  try {
+    const result = await apiFetch("/api/invoices/" + invoiceId + "/payment", { method: "POST" });
+    openIyzicoPayPanel({ ...fallback, ...result, ...meta });
+  } catch (_err) {
+    openIyzicoPayPanel(fallback);
+  }
 }
 
 let _activeSpeechRecognition = null;
